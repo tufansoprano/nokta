@@ -1,0 +1,34 @@
+# Keeps each venue's food hygiene rating in step with the Food Standards Agency
+# (NOKTA-20). Twice a week, so a changed official rating shows on Nokta within a
+# week even if one run fails.
+#
+# Needs repository secrets SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (production).
+name: Refresh food hygiene ratings
+
+on:
+  schedule:
+    - cron: "17 4 * * 1,4"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: refresh-food-hygiene
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run refresh:food-hygiene
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

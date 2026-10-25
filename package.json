@@ -31,8 +31,10 @@
     "check:crawler-body": "tsx scripts/check-crawler-body.ts",
     "check:seo": "npm run check:metadata && npm run check:crawler-body",
     "reconcile:venues": "tsx scripts/reconcile-venues.ts",
+    "refresh:food-hygiene": "tsx scripts/refresh-food-hygiene.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@radix-ui/react-select": "^2.3.7",

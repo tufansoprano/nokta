@@ -2,7 +2,7 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { existsSync, readFileSync } from "node:fs";
 import type { Plugin } from "vite";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 const devPort = Number(process.env.PORT ?? 5173);
 
@@ -30,6 +30,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.{ts,tsx}"],
+    // Integration tests hit the QA Supabase project; run them with npm run test:integration.
+    exclude: [...configDefaults.exclude, "src/**/*.integration.test.ts"],
   },
   build: {
     // The map library stays in its lazy route chunk; warn if it grows past 1.1 MB.

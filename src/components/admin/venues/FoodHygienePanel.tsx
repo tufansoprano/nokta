@@ -51,7 +51,7 @@ function FoodHygieneSummary({ hygiene }: { hygiene: VenueFoodHygiene | null }) {
   if (!hygiene) return <p className="text-nokta-ink-muted">Not checked yet.</p>;
 
   return (
-    <dl className="grid gap-1">
+    <div className="grid gap-1">
       <div>{FOOD_HYGIENE_LINK_STATUS_LABELS[hygiene.linkStatus]}</div>
       {hygiene.officialUrl ? (
         <a className="inline-flex items-center gap-1 underline" href={hygiene.officialUrl} target="_blank" rel="noreferrer">
@@ -63,6 +63,6 @@ function FoodHygieneSummary({ hygiene }: { hygiene: VenueFoodHygiene | null }) {
         {hygiene.ratingDate ? `, inspected ${hygiene.ratingDate}` : ""}
       </div>
       <div className="text-xs text-nokta-ink-muted">Last checked {new Date(hygiene.checkedAt).toLocaleString("en-GB")}</div>
-    </dl>
+    </div>
   );
 }

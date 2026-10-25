@@ -58,6 +58,7 @@ export function VenueForm({
   onDirtyChange,
   onSubmit,
   onInvalidSubmit,
+  foodHygienePanel,
 }: {
   initialValues: VenueFormValues;
   mode: "new" | "edit";
@@ -66,6 +67,7 @@ export function VenueForm({
   onDirtyChange: (isDirty: boolean) => void;
   onSubmit: (values: VenueFormValues) => Promise<void>;
   onInvalidSubmit?: (errors: Record<string, string>) => void;
+  foodHygienePanel?: React.ReactNode;
 }) {
   const [values, setValues] = useState(initialValues);
   const [slugWasEdited, setSlugWasEdited] = useState(mode === "edit");
@@ -269,6 +271,7 @@ export function VenueForm({
         <Field label="Source notes">
           <Textarea value={values.sourceNotes ?? ""} onChange={(event) => update("sourceNotes", nullableString(event.target.value))} />
         </Field>
+        {foodHygienePanel}
       </VenueFormSection>
 
       <VenueFormSection title="Verification">

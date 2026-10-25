@@ -3,6 +3,7 @@ import { Link, useBlocker, useNavigate, useParams, useSearchParams } from "react
 import { ExternalLink } from "lucide-react";
 import { AdminPageShell } from "@/components/admin/AdminPageShell";
 import { WorkspacePageHeader, workspaceSecondaryActionClass } from "@/components/workspace/WorkspacePageHeader";
+import { FoodHygienePanel } from "@/components/admin/venues/FoodHygienePanel";
 import { VenueForm } from "@/components/admin/venues/VenueForm";
 import { ErrorState } from "@/components/state/ErrorState";
 import { LoadingState } from "@/components/state/LoadingState";
@@ -237,6 +238,7 @@ export function VenueFormPage({ mode }: { mode: "new" | "edit" }) {
           saveError={saveError}
           onDirtyChange={setIsDirty}
           onSubmit={handleSubmit}
+          foodHygienePanel={mode === "edit" && id ? <FoodHygienePanel venueId={id} /> : undefined}
           onInvalidSubmit={(errors) => setToast({ type: "error", message: `Please fix ${formatValidationFields(errors)} before saving.` })}
         />
         {toast ? <Toast type={toast.type} title={toast.type === "success" ? "Saved" : "Save failed"} message={toast.message} offsetBottom onClose={() => setToast(null)} /> : null}

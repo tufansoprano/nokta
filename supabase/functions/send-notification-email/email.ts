@@ -42,7 +42,7 @@ export interface RenderedEmail {
 type Tone = "neutral" | "ok" | "bad" | "warn" | "info";
 type Row = [label: string, value: unknown];
 
-interface EmailContent {
+export interface EmailContent {
   subject: string;
   /** Short status label shown as a chip above the title. */
   status: { label: string; tone: Tone };
@@ -246,7 +246,7 @@ export function buildGenericEmail(notification: NotificationRow, appUrl: string)
   });
 }
 
-function renderEmail(content: EmailContent): RenderedEmail {
+export function renderEmail(content: EmailContent): RenderedEmail {
   const tone = tones[content.status.tone];
   const message = cleanMultiline(content.message?.body);
   const sections = content.sections

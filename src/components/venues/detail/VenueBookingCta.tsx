@@ -179,22 +179,18 @@ export function MobileBookingCta({ venue }: { venue: Venue }) {
 }
 
 /**
- * Still used by RequestBookingPage, which keeps its own gate for venues that turned
- * requests off after the customer landed on the form.
+ * Used by RequestBookingPage for a claimed venue that turned requests off after the
+ * customer landed on the form. Unclaimed venues never see this: nokta forwards their requests.
  */
-export function BookingUnavailableCard({ venue, state, className, compact = false }: { venue: Venue; state: "unclaimed" | "disabled"; className?: string; compact?: boolean }) {
-  const content = state === "unclaimed"
-    ? { title: "Books directly, not through nokta", body: `${venue.name} hasn't joined nokta yet, so we can't take a booking for them. Contact them and they'll answer straight away.` }
-    : { title: "Takes enquiries, not booking requests", body: `${venue.name} hasn't switched on date-and-time booking. Send an enquiry or contact them directly.` };
+export function BookingUnavailableCard({ venue, className, compact = false }: { venue: Venue; className?: string; compact?: boolean }) {
   return (
     <aside className={cn("rounded-2xl border border-nokta-border bg-nokta-surface p-5 shadow-sm shadow-stone-950/5", compact && "border-0 p-0 shadow-none", className)}>
-      <div className="flex items-start gap-3"><span className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-full bg-nokta-page-bg"><AlertCircle className="h-4 w-4 text-nokta-accent" /></span><div><h2 className="text-[15px] font-semibold text-nokta-ink">{content.title}</h2><p className="mt-2 text-sm leading-6 text-nokta-ink-muted">{content.body}</p></div></div>
+      <div className="flex items-start gap-3"><span className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-full bg-nokta-page-bg"><AlertCircle className="h-4 w-4 text-nokta-accent" /></span><div><h2 className="text-[15px] font-semibold text-nokta-ink">Takes enquiries, not booking requests</h2><p className="mt-2 text-sm leading-6 text-nokta-ink-muted">{venue.name} hasn't switched on date-and-time booking. Send an enquiry or contact them directly.</p></div></div>
       <div className="mt-4 grid gap-2">
         {venue.website ? <Button asChild className="h-11 rounded-lg bg-nokta-accent-solid text-white hover:bg-clay-accent-hover"><a href={venue.website} target="_blank" rel="noreferrer">Book on their website <ExternalLink className="ml-2 h-4 w-4" /></a></Button> : null}
         {venue.phone ? <Button asChild variant="outline" className="h-11 rounded-lg border-nokta-border bg-nokta-surface text-nokta-ink"><a href={`tel:${venue.phone}`}><Phone className="mr-2 h-4 w-4" />{venue.phone}</a></Button> : null}
-        {state === "disabled" ? <Button asChild variant="outline" className="h-11 rounded-lg border-nokta-border bg-nokta-surface text-nokta-ink" onClick={() => trackEnquiryCta(venue)}><Link to={`/venues/${venue.slug}/enquire`}>Send enquiry</Link></Button> : null}
+        <Button asChild variant="outline" className="h-11 rounded-lg border-nokta-border bg-nokta-surface text-nokta-ink" onClick={() => trackEnquiryCta(venue)}><Link to={`/venues/${venue.slug}/enquire`}>Send enquiry</Link></Button>
       </div>
-      {state === "unclaimed" ? <div className="mt-4 flex items-center justify-between gap-3 border-t border-nokta-border pt-4"><p className="text-[13px] text-nokta-ink-muted">Work here? Take bookings through nokta.</p><Button asChild size="sm" className="shrink-0 bg-nokta-solid-ink text-white hover:bg-nokta-solid-ink/90"><Link to={`/venues/${venue.slug}/claim`}>Claim venue</Link></Button></div> : null}
     </aside>
   );
 }

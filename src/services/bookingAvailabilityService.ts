@@ -64,9 +64,9 @@ export async function getVenueBookingGate(venueId: string): Promise<VenueBooking
    * A state this build does not know about is not a reason to refuse a booking.
    * The view is deployed separately from the app, so during a rollout it can
    * still return a state that has since been retired; treating that as an error
-   * blocks the request the customer came to make. The two states that describe
-   * what a venue cannot receive are explicit, and anything else is treated as
-   * live.
+   * blocks the request the customer came to make. Unclaimed and disabled are
+   * explicit, and anything else is treated as live. Only disabled refuses a
+   * request; unclaimed requests are forwarded to the venue by nokta.
    */
   const state: VenueBookingGate["state"] = data.state === "unclaimed" || data.state === "disabled" ? data.state : "live";
 

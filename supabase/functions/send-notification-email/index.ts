@@ -294,7 +294,7 @@ async function sendNotification(supabase: ReturnType<typeof createAdminClient>, 
 
 async function buildEmail(supabase: ReturnType<typeof createAdminClient>, notification: NotificationRow) {
   if (notification.booking_request_id) {
-    const { data, error } = await supabase.from("booking_requests").select("*,venues(name)").eq("id", notification.booking_request_id).single();
+    const { data, error } = await supabase.from("booking_requests").select("*,venues(name,phone,website,instagram)").eq("id", notification.booking_request_id).single();
     if (error) throw error;
     return buildBookingEmail(notification, data);
   }
@@ -317,6 +317,8 @@ function buildBookingEmail(notification: NotificationRow, booking: Record<string
 
   switch (notification.notification_type) {
     case "booking_request_submitted":
+      // Unclaimed venue: nokta forwards the request, so the admin gets everything needed to pass it on.
+      if (notification.recipient_type === "admin") return renderEmail({ subject: `Forward booking request: ${venueName}`, lines: [`${venueName} isn't on nokta yet. Pass this request on and record their answer.`, ...common, `Customer: ${clean(booking.customer_name)}`, `Email: ${clean(booking.customer_email)}`, optional("Phone", booking.customer_phone), optional("Occasion", booking.occasion), optional("Message", booking.message), optional("Venue phone", booking.venues?.phone), optional("Venue website", booking.venues?.website), optional("Venue Instagram", booking.venues?.instagram)], actionUrl: statusUrl, actionLabel: "Open in Demand", footer: "You received this email because you forward booking requests for unclaimed venues on Nokta." });
       if (notification.recipient_type === "owner") return renderEmail({ subject: `New booking request for ${venueName}`, lines: [`You have a new booking request for ${venueName}.`, ...common, `Customer: ${clean(booking.customer_name)}`, `Email: ${clean(booking.customer_email)}`, optional("Phone", booking.customer_phone), optional("Occasion", booking.occasion)], actionUrl: statusUrl ?? absoluteUrl(`/owner/bookings?booking=${booking.id}`), actionLabel: "Manage booking", owner: true });
       return renderEmail({ subject: "Your booking request has been sent", lines: [`Your booking request for ${venueName} has been sent.`, "This is not confirmed yet. The venue will review your request.", ...common], actionUrl: statusUrl, actionLabel: "View booking status" });
     case "booking_request_accepted":
@@ -354,11 +356,11 @@ function buildGenericEmail(notification: NotificationRow) {
   return renderEmail({ subject: clean(notification.notification_type), lines: ["There is a new Nokta notification."], actionUrl: notification.action_url ? absoluteUrl(notification.action_url) : null, actionLabel: notification.action_label });
 }
 
-function renderEmail(input: { subject: string; lines: string[]; actionUrl?: string | null; actionLabel?: string | null; owner?: boolean }) {
+function renderEmail(input: { subject: string; lines: string[]; actionUrl?: string | null; actionLabel?: string | null; owner?: boolean; footer?: string }) {
   const lines = input.lines.filter(Boolean).map((line) => truncate(clean(line), 700));
   const actionHtml = input.actionUrl ? `<p style="margin:28px 0 10px"><a href="${escapeHtml(input.actionUrl)}" style="display:inline-block;background:#B3543C;color:#ffffff;text-decoration:none;border-radius:12px;padding:13px 18px;font-weight:700">${escapeHtml(input.actionLabel ?? "Open Nokta")}</a></p><p style="margin:0;font-size:12px;line-height:1.5;color:#8C7C76;word-break:break-all">${escapeHtml(input.actionUrl)}</p>` : "";
   const htmlLines = lines.map((line) => `<p style="margin:0 0 10px">${escapeHtml(line)}</p>`).join("");
-  const footer = input.owner ? "You received this email because you manage a venue on Nokta." : "You received this email because you used Nokta for a booking or venue enquiry.";
+  const footer = input.footer ?? (input.owner ? "You received this email because you manage a venue on Nokta." : "You received this email because you used Nokta for a booking or venue enquiry.");
   const html = `<!doctype html><html><body style="margin:0;background:#FFF3E6;font-family:Arial,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1E130F"><main style="max-width:620px;margin:0 auto;padding:36px 18px"><div style="font-size:22px;font-weight:800;letter-spacing:-0.5px;margin-bottom:22px;color:#1E130F">nokta<span style="color:#DB5D2C">.</span></div><section style="background:#FEFDFD;border:1px solid #E2D0C4;border-radius:18px;padding:28px;box-shadow:0 18px 44px rgba(30,19,15,0.06)"><h1 style="margin:0 0 16px;font-size:26px;line-height:1.2;color:#1E130F">${escapeHtml(input.subject)}</h1><div style="height:1px;background:#E2D0C4;margin:0 0 18px"></div><div style="font-size:15px;line-height:1.7;color:#483A34">${htmlLines}</div>${actionHtml}</section><p style="margin:18px 4px 0;font-size:12px;line-height:1.6;color:#8C7C76">${escapeHtml(footer)}</p></main></body></html>`;
   const text = [input.subject, "", ...lines, ...(input.actionUrl ? ["", input.actionLabel ?? "Open Nokta", input.actionUrl] : []), "", footer].join("\n");
   return { subject: input.subject, html, text };

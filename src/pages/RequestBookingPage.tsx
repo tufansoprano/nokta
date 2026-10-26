@@ -57,7 +57,7 @@ export function RequestBookingPage() {
   if (gateError) return <main><PageContainer className="py-20"><ErrorState message={gateError} /></PageContainer></main>;
   if (!venue) return <main><PageMeta title="Venue not found | nokta" description="This venue is not available." /><PageContainer className="py-20"><ErrorState title="Venue not found" message="This venue is not available." /></PageContainer></main>;
 
-  if (gate && gate.state !== "live") return <main className="bg-nokta-page-bg"><PageMeta title={`${venue.name} books directly | nokta`} description={`Contact ${venue.name} directly about a booking.`} canonicalPath={`/venues/${venue.slug}/request-booking`} /><PageContainer className="py-10"><Link to={`/venues/${venue.slug}`} className="mb-5 inline-flex text-sm font-medium text-muted-foreground hover:text-foreground">Back to {venue.name}</Link><div className="mx-auto max-w-xl"><BookingUnavailableCard venue={venue} state={gate.state} /><Button asChild variant="outline" className="mt-3 w-full"><Link to="/">Venues nearby that do take bookings</Link></Button></div></PageContainer></main>;
+  if (gate?.state === "disabled") return <main className="bg-nokta-page-bg"><PageMeta title={`${venue.name} takes enquiries | nokta`} description={`Send ${venue.name} an enquiry or contact them directly.`} canonicalPath={`/venues/${venue.slug}/request-booking`} /><PageContainer className="py-10"><Link to={`/venues/${venue.slug}`} className="mb-5 inline-flex text-sm font-medium text-muted-foreground hover:text-foreground">Back to {venue.name}</Link><div className="mx-auto max-w-xl"><BookingUnavailableCard venue={venue} /><Button asChild variant="outline" className="mt-3 w-full"><Link to="/">Venues nearby that do take bookings</Link></Button></div></PageContainer></main>;
 
   return (
     <main>
@@ -69,12 +69,13 @@ export function RequestBookingPage() {
             <div>
               <p className="text-sm text-muted-foreground">{venue.city} • {venue.area}</p>
               <h1 className="mt-2 font-brand text-4xl font-bold tracking-[-0.5px]">Request booking at {venue.name}</h1>
+              {!venue.isClaimed ? <p className="mt-3 text-sm leading-6 text-muted-foreground">{venue.name} isn't on nokta yet. Send your request and we'll pass it on to them, then let you know their answer.</p> : null}
             </div>
             {success ? (
               <div className="space-y-4">
                 <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900">
                   <strong>Your booking request has been sent.</strong>
-                  <span className="mt-1 block">This is not a confirmed booking yet. The venue will review your request and follow up.</span>
+                  <span className="mt-1 block">{venue.isClaimed ? "This is not a confirmed booking yet. The venue will review your request and follow up." : `This is not a confirmed booking yet. We'll pass it on to ${venue.name} and let you know their answer.`}</span>
                 </Alert>
                 {createdRequest?.confirmationReference ? <div className="rounded-xl border bg-muted/40 p-4 text-sm"><span className="block text-xs uppercase text-muted-foreground">Booking reference</span><strong className="mt-1 block">{createdRequest.confirmationReference}</strong></div> : null}
                 <div className="flex flex-col gap-2 sm:flex-row">

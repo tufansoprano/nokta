@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildFoodHygieneRow,
   formatFoodHygieneRating,
+  getFoodHygieneDisplay,
   mapEstablishmentToRecord,
   mapFoodHygieneRow,
   matchEstablishment,
@@ -210,5 +211,38 @@ describe("formatFoodHygieneRating", () => {
   it("shows scores out of 5 and Scottish results as given", () => {
     expect(formatFoodHygieneRating("4")).toBe("4 out of 5");
     expect(formatFoodHygieneRating("Improvement Required")).toBe("Improvement Required");
+  });
+});
+
+describe("getFoodHygieneDisplay", () => {
+  it("shows the score, inspection date and official page", () => {
+    expect(getFoodHygieneDisplay(stored({}))).toEqual({
+      heading: "Food hygiene rating",
+      result: "5 out of 5",
+      inspectedLabel: "Inspected 7 October 2021",
+      officialUrl: "https://ratings.food.gov.uk/business/1316490",
+      officialLinkLabel: "Official rating",
+    });
+  });
+
+  it("shows low scores exactly as given", () => {
+    for (const rating of ["0", "1", "2"] as const) {
+      expect(getFoodHygieneDisplay(stored({ rating }))).toMatchObject({ heading: "Food hygiene rating", result: `${rating} out of 5` });
+    }
+  });
+
+  it("shows Scottish results in Scotland's own format", () => {
+    expect(getFoodHygieneDisplay(stored({ scheme: "FHIS", rating: "Pass" }))).toMatchObject({ heading: "Food hygiene inspection", result: "Pass", officialLinkLabel: "Official inspection result" });
+    expect(getFoodHygieneDisplay(stored({ scheme: "FHIS", rating: "Improvement Required" }))).toMatchObject({ result: "Improvement Required" });
+  });
+
+  it("leaves out the date when the official record has none", () => {
+    expect(getFoodHygieneDisplay(stored({ ratingDate: null }))?.inspectedLabel).toBeNull();
+  });
+
+  it("shows nothing without a rating, including Awaiting inspection and Exempt", () => {
+    expect(getFoodHygieneDisplay(null)).toBeNull();
+    expect(getFoodHygieneDisplay(stored({ rating: null, ratingDate: null }))).toBeNull();
+    expect(getFoodHygieneDisplay(stored({ linkStatus: "unmatched", fhrsId: null, scheme: null, rating: null, ratingDate: null, officialUrl: null }))).toBeNull();
   });
 });

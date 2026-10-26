@@ -36,7 +36,7 @@ export function PhotoGallery({ venue, images, onOpenImage }: { venue: Venue; ima
 
   const stripImages = images.slice(0, 4);
   const allPhotosButton = (
-    <button type="button" aria-label={`View all ${images.length} photos`} className="absolute bottom-2.5 right-2.5 inline-flex min-h-[34px] max-w-[calc(100%-1.25rem)] items-center gap-[7px] whitespace-nowrap rounded-lg bg-nokta-surface px-3 text-[12.5px] font-semibold text-nokta-ink shadow-sm transition-colors hover:bg-nokta-hover" onClick={() => onOpenImage(0)}>
+    <button type="button" aria-label={`View all ${images.length} photos`} className="absolute bottom-2.5 right-2.5 z-10 inline-flex min-h-[34px] max-w-[calc(100%-1.25rem)] items-center gap-[7px] whitespace-nowrap rounded-lg bg-white px-3 text-[12.5px] font-semibold text-stone-900 shadow-sm transition-colors hover:bg-stone-100" onClick={() => onOpenImage(0)}>
       <Camera className="h-3.5 w-3.5 shrink-0" />
       {/* Phones share the corner with the position dots, so show the bare count there. */}
       <span className="hidden sm:inline">All {images.length} photos</span>
@@ -215,24 +215,24 @@ export function PhotoLightbox({ venue, images, activeIndex, onChange, onClose }:
   }
 
   return (
-    <div className="fixed inset-0 z-[1500] bg-stone-950/90 p-3 text-background sm:p-6" role="dialog" aria-modal="true" aria-label={`${venue.name} photo viewer`}>
+    <div className="fixed inset-0 z-[1500] bg-stone-950/90 p-3 text-white sm:p-6" role="dialog" aria-modal="true" aria-label={`${venue.name} photo viewer`}>
       <button type="button" className="absolute inset-0 cursor-default" aria-label="Close photo viewer" onClick={onClose} />
       <div className="relative z-10 flex h-full flex-col">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold">{venue.name}</p>
-            <p className="text-xs text-background/65">
+            <p className="text-xs text-white/70">
               Photo {activeIndex + 1} of {images.length}
             </p>
           </div>
-          <Button type="button" variant="secondary" size="icon" className="bg-background/10 text-background hover:bg-background/20" aria-label="Close photo viewer" onClick={onClose}>
+          <Button type="button" variant="secondary" size="icon" className="bg-white/15 text-white hover:bg-white/25" aria-label="Close photo viewer" onClick={onClose}>
             <X className="h-5 w-5" />
           </Button>
         </div>
 
         <div className="relative flex min-h-0 flex-1 items-center justify-center" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
           {hasMultipleImages ? (
-            <Button type="button" variant="secondary" size="icon" className="absolute left-0 z-20 bg-background/10 text-background hover:bg-background/20 sm:left-3" aria-label="Previous photo" onClick={() => onChange(getPreviousImageIndex(activeIndex, images.length))}>
+            <Button type="button" variant="secondary" size="icon" className="absolute left-0 z-20 bg-white/15 text-white hover:bg-white/25 sm:left-3" aria-label="Previous photo" onClick={() => onChange(getPreviousImageIndex(activeIndex, images.length))}>
               <ChevronLeft className="h-6 w-6" />
             </Button>
           ) : null}
@@ -240,7 +240,7 @@ export function PhotoLightbox({ venue, images, activeIndex, onChange, onClose }:
           <img src={activeImage} alt={`${venue.name} expanded photo ${activeIndex + 1}`} className="max-h-full max-w-full rounded-xl object-contain shadow-2xl shadow-stone-950/40" />
 
           {hasMultipleImages ? (
-            <Button type="button" variant="secondary" size="icon" className="absolute right-0 z-20 bg-background/10 text-background hover:bg-background/20 sm:right-3" aria-label="Next photo" onClick={() => onChange(getNextImageIndex(activeIndex, images.length))}>
+            <Button type="button" variant="secondary" size="icon" className="absolute right-0 z-20 bg-white/15 text-white hover:bg-white/25 sm:right-3" aria-label="Next photo" onClick={() => onChange(getNextImageIndex(activeIndex, images.length))}>
               <ChevronRight className="h-6 w-6" />
             </Button>
           ) : null}
@@ -249,7 +249,7 @@ export function PhotoLightbox({ venue, images, activeIndex, onChange, onClose }:
         {hasMultipleImages ? (
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
             {images.map((image, index) => (
-              <button key={`${image}-thumb-${index}`} type="button" className={cn("h-16 w-24 shrink-0 overflow-hidden rounded-lg border transition", index === activeIndex ? "border-background" : "border-background/20 opacity-65 hover:opacity-100")} aria-label={`Open photo ${index + 1}`} onClick={() => onChange(index)}>
+              <button key={`${image}-thumb-${index}`} type="button" className={cn("h-16 w-24 shrink-0 overflow-hidden rounded-lg border transition", index === activeIndex ? "border-white" : "border-white/20 opacity-65 hover:opacity-100")} aria-label={`Open photo ${index + 1}`} onClick={() => onChange(index)}>
                 <img src={image} alt={`${venue.name} thumbnail ${index + 1}`} className="h-full w-full object-cover" />
               </button>
             ))}

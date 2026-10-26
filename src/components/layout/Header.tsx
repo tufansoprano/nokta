@@ -1,4 +1,3 @@
-import { NavLocationControl } from "@/components/location/NavLocationControl";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { Wordmark } from "@/components/layout/Wordmark";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
@@ -135,7 +134,6 @@ export function Header() {
               For venues
             </NavLink>
             <span aria-hidden="true" className="mx-1 h-5 w-px bg-nokta-border" />
-            <NavLocationControl />
             <ThemeToggle />
             <NotificationBell />
             {user ? (
@@ -205,7 +203,6 @@ export function Header() {
             )}
           </div>
           <div className="flex items-center gap-1 md:hidden">
-            <NavLocationControl compact />
             <NotificationBell />
             <Button
               type="button"

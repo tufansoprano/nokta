@@ -46,6 +46,12 @@ interface PostcodesIoResponse {
   } | null;
 }
 
+/** A full postcode ("E1 6AN") or just its outward half ("E1"). */
+export function looksLikeUkPostcode(input: string) {
+  const value = input.trim();
+  return FULL_UK_POSTCODE_PATTERN.test(value) || UK_OUTCODE_PATTERN.test(value);
+}
+
 export async function resolveManualLocation(input: string): Promise<UserLocation | null> {
   const label = input.trim();
   if (!label) {

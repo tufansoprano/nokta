@@ -1,31 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildBookingEmail, buildEnquiryEmail, buildGenericEmail, clean, type NotificationRow } from "./email.ts";
 
 // This function is invoked server-to-server by the /api/send-notification-email
 // proxy, never from a browser, so no cross-origin access is granted.
 const corsHeaders = {};
-
-type NotificationType =
-  | "booking_request_submitted"
-  | "booking_request_accepted"
-  | "booking_request_declined"
-  | "booking_alternative_proposed"
-  | "booking_alternative_accepted"
-  | "booking_alternative_declined"
-  | "booking_cancelled"
-  | "booking_reply"
-  | "enquiry_submitted";
-
-interface NotificationRow {
-  id: string;
-  recipient_email: string | null;
-  recipient_type: "owner" | "customer" | "admin";
-  notification_type: NotificationType;
-  action_url: string | null;
-  action_label: string | null;
-  booking_request_id: string | null;
-  enquiry_id: string | null;
-  venue_id: string | null;
-}
 
 function jsonResponse(body: unknown, init: ResponseInit = {}) {
   return new Response(JSON.stringify(body), {
@@ -294,80 +272,16 @@ async function sendNotification(supabase: ReturnType<typeof createAdminClient>, 
 
 async function buildEmail(supabase: ReturnType<typeof createAdminClient>, notification: NotificationRow) {
   if (notification.booking_request_id) {
-    const { data, error } = await supabase.from("booking_requests").select("*,venues(name,phone,website,instagram)").eq("id", notification.booking_request_id).single();
+    const { data, error } = await supabase.from("booking_requests").select("*,venues(name,phone,website,instagram,is_claimed)").eq("id", notification.booking_request_id).single();
     if (error) throw error;
-    return buildBookingEmail(notification, data);
+    return buildBookingEmail(notification, data, appUrl());
   }
   if (notification.enquiry_id) {
     const { data, error } = await supabase.from("venue_enquiries").select("*,venues(name)").eq("id", notification.enquiry_id).single();
     if (error) throw error;
-    return buildEnquiryEmail(notification, data);
+    return buildEnquiryEmail(notification, data, appUrl());
   }
-  return buildGenericEmail(notification);
-}
-
-const ADMIN_FORWARDING_FOOTER = "You received this email because you forward booking requests for unclaimed venues on Nokta.";
-
-function buildBookingEmail(notification: NotificationRow, booking: Record<string, any>) {
-  const venueName = clean(booking.venues?.name ?? "your venue");
-  const statusUrl = notification.action_url ? absoluteUrl(notification.action_url) : null;
-  const requested = `${clean(booking.requested_date)} ${clean(booking.requested_time)}`.trim();
-  const proposed = `${clean(booking.proposed_date)} ${clean(booking.proposed_time)}`.trim();
-  const reference = clean(booking.confirmation_reference ?? "Pending");
-  const party = booking.party_size ? `${booking.party_size} people` : "";
-  const common = [`Venue: ${venueName}`, `Requested: ${requested}`, `Party size: ${party}`, `Reference: ${reference}`].filter(Boolean);
-
-  switch (notification.notification_type) {
-    case "booking_request_submitted":
-      // Unclaimed venue: nokta forwards the request, so the admin gets everything needed to pass it on.
-      if (notification.recipient_type === "admin") return renderEmail({ subject: `Forward booking request: ${venueName}`, lines: [`${venueName} isn't on nokta yet. Pass this request on and record their answer.`, ...common, `Customer: ${clean(booking.customer_name)}`, `Email: ${clean(booking.customer_email)}`, optional("Phone", booking.customer_phone), optional("Occasion", booking.occasion), optional("Message", booking.message), optional("Venue phone", booking.venues?.phone), optional("Venue website", booking.venues?.website), optional("Venue Instagram", booking.venues?.instagram)], actionUrl: statusUrl, actionLabel: "Open in Demand", footer: ADMIN_FORWARDING_FOOTER });
-      if (notification.recipient_type === "owner") return renderEmail({ subject: `New booking request for ${venueName}`, lines: [`You have a new booking request for ${venueName}.`, ...common, `Customer: ${clean(booking.customer_name)}`, `Email: ${clean(booking.customer_email)}`, optional("Phone", booking.customer_phone), optional("Occasion", booking.occasion)], actionUrl: statusUrl ?? absoluteUrl(`/owner/bookings?booking=${booking.id}`), actionLabel: "Manage booking", owner: true });
-      return renderEmail({ subject: "Your booking request has been sent", lines: [`Your booking request for ${venueName} has been sent.`, "This is not confirmed yet. The venue will review your request.", ...common], actionUrl: statusUrl, actionLabel: "View booking status" });
-    case "booking_request_accepted":
-      return renderEmail({ subject: "Your booking is confirmed", lines: [`${venueName} has accepted your booking request. Your booking is confirmed.`, ...common, optional("Venue message", booking.owner_response_message)], actionUrl: statusUrl, actionLabel: "View booking status" });
-    case "booking_request_declined":
-      return renderEmail({ subject: "Your booking request was declined", lines: [`${venueName} was unable to accept your booking request.`, ...common, optional("Venue message", booking.owner_response_message)], actionUrl: statusUrl, actionLabel: "View booking status" });
-    case "booking_alternative_proposed":
-      return renderEmail({ subject: `${venueName} proposed another booking time`, lines: [`${venueName} has suggested another date or time for your booking.`, `Original request: ${requested}`, `Proposed: ${proposed}`, `Party size: ${party}`, optional("Venue message", booking.proposed_message)], actionUrl: statusUrl, actionLabel: "Review alternative" });
-    case "booking_alternative_accepted":
-      if (notification.recipient_type === "admin") return renderEmail({ subject: `Customer accepted the suggested time at ${venueName}`, lines: [`The customer accepted the time suggested for ${venueName}. Let the venue know.`, ...common, `Proposed: ${proposed}`, `Customer: ${clean(booking.customer_name)}`, `Email: ${clean(booking.customer_email)}`, optional("Phone", booking.customer_phone), optional("Venue phone", booking.venues?.phone)], actionUrl: statusUrl, actionLabel: "Open in Demand", footer: ADMIN_FORWARDING_FOOTER });
-      return renderEmail({ subject: "Customer accepted your proposed booking time", lines: [`The customer accepted your proposed booking time for ${venueName}.`, ...common, `Customer: ${clean(booking.customer_name)}`], actionUrl: absoluteUrl(`/owner/bookings?booking=${booking.id}`), actionLabel: "View booking", owner: true });
-    case "booking_alternative_declined":
-      if (notification.recipient_type === "admin") return renderEmail({ subject: `Customer declined the suggested time at ${venueName}`, lines: [`The customer declined the time suggested for ${venueName}. Let the venue know.`, `Original request: ${requested}`, `Proposed: ${proposed}`, `Party size: ${party}`, `Customer: ${clean(booking.customer_name)}`, optional("Customer response", booking.customer_alternative_response_message), optional("Venue phone", booking.venues?.phone)], actionUrl: statusUrl, actionLabel: "Open in Demand", footer: ADMIN_FORWARDING_FOOTER });
-      return renderEmail({ subject: "Customer declined your proposed booking time", lines: [`The customer declined your proposed booking time for ${venueName}.`, `Original request: ${requested}`, `Proposed: ${proposed}`, `Party size: ${party}`, `Customer: ${clean(booking.customer_name)}`, optional("Customer response", booking.customer_alternative_response_message)], actionUrl: absoluteUrl(`/owner/bookings?booking=${booking.id}`), actionLabel: "View booking", owner: true });
-    case "booking_cancelled":
-      return renderEmail({ subject: "Your booking was cancelled", lines: [`${venueName} cancelled this booking.`, ...common], actionUrl: statusUrl, actionLabel: "View booking status" });
-    case "booking_reply":
-      // A reply does not change the booking, so the status stays out of the subject.
-      return renderEmail({ subject: `${venueName} replied to your booking request`, lines: [`${venueName} replied to your booking request.`, optional("Venue message", booking.owner_response_message), "", ...common], actionUrl: statusUrl, actionLabel: "View booking status" });
-    default:
-      return buildGenericEmail(notification);
-  }
-}
-
-function buildEnquiryEmail(notification: NotificationRow, enquiry: Record<string, any>) {
-  const venueName = clean(enquiry.venues?.name ?? "your venue");
-  return renderEmail({
-    subject: `New enquiry for ${venueName}`,
-    lines: [`You have a new enquiry for ${venueName}.`, optional("Type", enquiry.enquiry_type), `Customer: ${clean(enquiry.customer_name)}`, `Email: ${clean(enquiry.customer_email)}`, optional("Phone", enquiry.customer_phone), optional("Message", enquiry.message)],
-    actionUrl: absoluteUrl(notification.action_url ?? "/owner/enquiries"),
-    actionLabel: notification.action_label ?? "View enquiries",
-    owner: true,
-  });
-}
-
-function buildGenericEmail(notification: NotificationRow) {
-  return renderEmail({ subject: clean(notification.notification_type), lines: ["There is a new Nokta notification."], actionUrl: notification.action_url ? absoluteUrl(notification.action_url) : null, actionLabel: notification.action_label });
-}
-
-function renderEmail(input: { subject: string; lines: string[]; actionUrl?: string | null; actionLabel?: string | null; owner?: boolean; footer?: string }) {
-  const lines = input.lines.filter(Boolean).map((line) => truncate(clean(line), 700));
-  const actionHtml = input.actionUrl ? `<p style="margin:28px 0 10px"><a href="${escapeHtml(input.actionUrl)}" style="display:inline-block;background:#B3543C;color:#ffffff;text-decoration:none;border-radius:12px;padding:13px 18px;font-weight:700">${escapeHtml(input.actionLabel ?? "Open Nokta")}</a></p><p style="margin:0;font-size:12px;line-height:1.5;color:#8C7C76;word-break:break-all">${escapeHtml(input.actionUrl)}</p>` : "";
-  const htmlLines = lines.map((line) => `<p style="margin:0 0 10px">${escapeHtml(line)}</p>`).join("");
-  const footer = input.footer ?? (input.owner ? "You received this email because you manage a venue on Nokta." : "You received this email because you used Nokta for a booking or venue enquiry.");
-  const html = `<!doctype html><html><body style="margin:0;background:#FFF3E6;font-family:Arial,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1E130F"><main style="max-width:620px;margin:0 auto;padding:36px 18px"><div style="font-size:22px;font-weight:800;letter-spacing:-0.5px;margin-bottom:22px;color:#1E130F">nokta<span style="color:#DB5D2C">.</span></div><section style="background:#FEFDFD;border:1px solid #E2D0C4;border-radius:18px;padding:28px;box-shadow:0 18px 44px rgba(30,19,15,0.06)"><h1 style="margin:0 0 16px;font-size:26px;line-height:1.2;color:#1E130F">${escapeHtml(input.subject)}</h1><div style="height:1px;background:#E2D0C4;margin:0 0 18px"></div><div style="font-size:15px;line-height:1.7;color:#483A34">${htmlLines}</div>${actionHtml}</section><p style="margin:18px 4px 0;font-size:12px;line-height:1.6;color:#8C7C76">${escapeHtml(footer)}</p></main></body></html>`;
-  const text = [input.subject, "", ...lines, ...(input.actionUrl ? ["", input.actionLabel ?? "Open Nokta", input.actionUrl] : []), "", footer].join("\n");
-  return { subject: input.subject, html, text };
+  return buildGenericEmail(notification, appUrl());
 }
 
 async function updateLog(supabase: ReturnType<typeof createAdminClient>, deliveryLogId: string, updates: Record<string, unknown>) {
@@ -378,15 +292,8 @@ async function updateLog(supabase: ReturnType<typeof createAdminClient>, deliver
   if (error) throw error;
 }
 
-function absoluteUrl(path: string) {
-  if (path.startsWith("http://") || path.startsWith("https://")) return path;
-  const appUrl = Deno.env.get("APP_URL") ?? Deno.env.get("LIVE_APP_URL") ?? "http://localhost:5173";
-  return `${appUrl.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
-}
-
-function optional(label: string, value: unknown) {
-  const next = clean(value);
-  return next ? `${label}: ${next}` : "";
+function appUrl() {
+  return Deno.env.get("APP_URL") ?? Deno.env.get("LIVE_APP_URL") ?? "http://localhost:5173";
 }
 
 function asUuid(value: unknown): string | undefined {
@@ -394,17 +301,9 @@ function asUuid(value: unknown): string | undefined {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value) ? value : undefined;
 }
 
-function clean(value: unknown) {
-  return String(value ?? "").replace(/\s+/g, " ").trim();
-}
-
 function truncate(value: string, maxLength: number) {
   if (value.length <= maxLength) return value;
   return `${value.slice(0, maxLength - 1).trim()}...`;
-}
-
-function escapeHtml(value: string) {
-  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\"", "&quot;").replaceAll("'", "&#039;");
 }
 
 function safeError(value: string) {

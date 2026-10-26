@@ -10,7 +10,8 @@ interface AppLocationContextValue {
   userLocation: UserLocation | null;
   locationStatus: LocationStatus;
   hasCoordinates: boolean;
-  setManualLocation: (label: string) => Promise<void>;
+  /** Centre on a searched place (postcode, area, town) instead of the visitor. */
+  setPlaceLocation: (place: UserLocation & { label: string }) => void;
   useCurrentLocation: () => void;
   clearLocation: () => void;
 }
@@ -54,30 +55,36 @@ export function AppLocationProvider({ children }: { children: React.ReactNode })
     };
   }, [savedLocation]);
 
+  // A visitor who has already allowed location gets a fresh fix on every visit, with no prompt.
+  // Anyone else is only asked when they tap the map's locate button.
+  useEffect(() => {
+    if (!navigator.permissions?.query || !navigator.geolocation) return;
+    let active = true;
+    navigator.permissions
+      .query({ name: "geolocation" })
+      .then((permission) => {
+        if (active && permission.state === "granted") useCurrentLocation();
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function persistLocation(location: SavedUserLocation | null) {
     setSavedLocationState(location);
     writeJsonToStorage(STORAGE_KEY, location);
   }
 
-  async function setManualLocation(label: string) {
-    const trimmedLabel = label.trim();
-    if (!trimmedLabel) {
-      clearLocation();
-      return;
-    }
-
-    setLocationStatus("loading");
-    const coordinates = await resolveManualLocation(trimmedLabel);
+  function setPlaceLocation(place: UserLocation & { label: string }) {
     persistLocation({
-      label: coordinates?.label ?? trimmedLabel,
-      coordinates,
+      label: place.label,
+      coordinates: { ...place, source: "manual" },
       source: "manual",
       updatedAt: new Date().toISOString(),
     });
-    trackEvent("location_enabled", {
-      source: "manual",
-      hasCoordinates: Boolean(coordinates),
-    });
+    trackEvent("location_enabled", { source: "manual", hasCoordinates: true });
     setLocationStatus("success");
   }
 
@@ -129,7 +136,7 @@ export function AppLocationProvider({ children }: { children: React.ReactNode })
       userLocation,
       locationStatus,
       hasCoordinates,
-      setManualLocation,
+      setPlaceLocation,
       useCurrentLocation,
       clearLocation,
     }),

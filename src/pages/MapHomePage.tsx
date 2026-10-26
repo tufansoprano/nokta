@@ -13,6 +13,7 @@ import { useVenues } from "@/hooks/useVenues";
 import { trackEvent } from "@/lib/analytics";
 import { DEFAULT_CITY, getActiveCities, getCityByName } from "@/lib/cities";
 import { readHomeSeed } from "@/lib/homeSeed";
+import { looksLikeUkPostcode, resolveManualLocation } from "@/lib/manualLocation";
 import { calculateDistanceMiles, formatDistanceMiles, getNearestVenueCity, getVenueDistanceMiles } from "@/lib/location";
 import { getVenueOpeningBoundary } from "@/lib/openingHours";
 import { cn } from "@/lib/utils";
@@ -52,7 +53,8 @@ interface MapVenue {
 export function MapHomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { venues, isLoading } = useVenues();
-  const { userLocation, locationStatus, useCurrentLocation } = useAppLocation();
+  const { savedLocation, userLocation, locationStatus, useCurrentLocation, setPlaceLocation, clearLocation } = useAppLocation();
+  const placeLabel = savedLocation?.source === "manual" && userLocation ? savedLocation.label : null;
   const isDesktop = useMediaQuery("(min-width: 1024px)");
   const [firstCardReady, setFirstCardReady] = useState(false);
   const [loadMap, setLoadMap] = useState(isDesktop);
@@ -66,7 +68,14 @@ export function MapHomePage() {
   const requestedCity = searchParams.get("city");
   const city = requestedCity && getCityByName(requestedCity) ? getCityByName(requestedCity)!.name : homeCity;
   const query = (searchParams.get("q") ?? "").trim();
-  const [draft, setDraft] = useState(query);
+  // A searched place stays in the box so the visitor can see, and clear, what the list is centred on.
+  const [draft, setDraft] = useState(query || placeLabel || "");
+  const lastPlaceRef = useRef(placeLabel);
+  useEffect(() => {
+    const lastPlace = lastPlaceRef.current;
+    lastPlaceRef.current = placeLabel;
+    if (lastPlace && !placeLabel) setDraft((current) => (current === lastPlace ? "" : current));
+  }, [placeLabel]);
   const [listLimit, setListLimit] = useState(LIST_PAGE);
   // A searched-for venue is usually wanted whether or not it is open right now.
   const [active, setActive] = useState<Set<FilterKey>>(() => new Set(query ? [] : ["openNow"]));
@@ -198,15 +207,16 @@ export function MapHomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, mapVenues.length > 0]);
 
-  // Once the browser hands over a position, fly there.
+  // Once the browser hands over a fresh position, fly there.
   useEffect(() => {
-    if (!wantsLocation || !userLocation) return;
+    if (!wantsLocation || locationStatus === "loading") return;
     setWantsLocation(false);
+    if (locationStatus !== "success" || !userLocation) return;
     // Drop any picked city so the list follows the visitor to their nearest one.
     if (searchParams.has("city")) updateParams({ city: null });
     setFocus({ latitude: userLocation.latitude, longitude: userLocation.longitude, zoom: 14 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wantsLocation, userLocation]);
+  }, [wantsLocation, locationStatus, userLocation]);
 
   function updateParams(next: Record<string, string | null>) {
     const params = new URLSearchParams(searchParams);
@@ -229,11 +239,7 @@ export function MapHomePage() {
 
   function locate() {
     trackEvent("map_home_locate_clicked");
-    if (userLocation) {
-      if (searchParams.has("city")) updateParams({ city: null });
-      setFocus({ latitude: userLocation.latitude, longitude: userLocation.longitude, zoom: 14 });
-      return;
-    }
+    // Always ask for a fresh fix: a saved postcode or an old position is not where the visitor is now.
     setWantsLocation(true);
     useCurrentLocation();
   }
@@ -266,9 +272,24 @@ export function MapHomePage() {
     if (closest && closest !== selectedId) setSelectedId(closest);
   }
 
-  function handleSearch(event: FormEvent<HTMLFormElement>) {
+  async function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const next = draft.trim();
+    // A postcode, or words no venue matches, is a place: centre the map and the list on it.
+    if (next && (looksLikeUkPostcode(next) || !venues.some((venue) => matchesSearch(venue, normalise(next).split(/\s+/))))) {
+      const place = await resolveManualLocation(next);
+      if (place) {
+        const label = place.label ?? next;
+        setPlaceLocation({ ...place, label });
+        setDraft(label);
+        updateParams({ q: null, city: null });
+        setSelectedId(null);
+        setFocus({ latitude: place.latitude, longitude: place.longitude, zoom: 14 });
+        (document.activeElement as HTMLElement | null)?.blur();
+        trackEvent("map_home_searched", { hasQuery: true, place: true });
+        return;
+      }
+    }
     updateParams({ q: next || null });
     // A searched-for venue is usually wanted whether or not it is open right now.
     if (next) setActive((current) => {
@@ -285,13 +306,14 @@ export function MapHomePage() {
   function clearSearch() {
     setDraft("");
     updateParams({ q: null });
+    if (placeLabel) clearLocation();
     setSelectedId(null);
     const config = getCityByName(city);
     if (config) setFocus({ latitude: config.latitude, longitude: config.longitude, zoom: config.defaultZoom + 1 });
   }
 
   const openCount = cityVenues.filter((item) => item.isOpen).length;
-  const where = userLocation ? "near you" : `in ${city}`;
+  const where = placeLabel ? `near ${placeLabel}` : userLocation ? "near you" : `in ${city}`;
   const heading = query
     ? `${results.length} ${results.length === 1 ? "match" : "matches"} for “${query}”`
     : active.has("openNow")

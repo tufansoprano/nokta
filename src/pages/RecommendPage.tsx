@@ -75,7 +75,8 @@ export function RecommendPage() {
   const [isPreparingShare, setIsPreparingShare] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const city = savedLocation?.label ?? DEFAULT_CITY;
+  // Where distances are measured from, as the distance question words it.
+  const origin = !userLocation ? "central London" : savedLocation?.source === "manual" ? savedLocation.label : "your current location";
   const cityVenues = useMemo(() => venues.filter((venue) => venue.city === DEFAULT_CITY), [venues]);
   const matches = useMemo(() => strictMatches(cityVenues, answers, userLocation), [cityVenues, answers, userLocation]);
   const picks = useMemo(() => pickThree(cityVenues, answers, userLocation, swap), [cityVenues, answers, userLocation, swap]);
@@ -370,7 +371,7 @@ export function RecommendPage() {
           isSelected={(value) => (question.multi ? answers.vibes.includes(value as VenueVibe) : String(answers[question.key] ?? "") === String(value))}
           matchCount={matches.length}
           vibeCount={answers.vibes.length}
-          neighbourhood={city}
+          neighbourhood={origin}
           hasPreciseLocation={Boolean(userLocation)}
           onPick={answerQuestion}
           onContinue={continueFromVibes}

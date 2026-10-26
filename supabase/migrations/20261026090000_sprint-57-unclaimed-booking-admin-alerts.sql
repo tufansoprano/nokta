@@ -5,8 +5,17 @@
 -- the request sat on the admin Demand page with nobody told about it. This adds
 -- an admin email for those requests so nokta can pass them on to the venue.
 --
--- The admin inbox is a single address for now. Move it to a settings table when
--- more than one person handles forwarding.
+-- The admin inbox is a single address for now, held in one function so the
+-- triggers that email it share it. Move it to a settings table when more than
+-- one person handles forwarding.
+
+create or replace function public.get_booking_forwarding_admin_email()
+returns text
+language sql
+immutable
+as $$ select 'tufanbutuner@gmail.com'::text $$;
+
+revoke execute on function public.get_booking_forwarding_admin_email() from public, anon, authenticated;
 
 create or replace function public.notify_booking_request_inserted()
 returns trigger
@@ -101,7 +110,7 @@ begin
     )
     values (
       null,
-      'tufanbutuner@gmail.com',
+      public.get_booking_forwarding_admin_email(),
       'admin',
       'booking_request_submitted',
       'Booking request to forward',

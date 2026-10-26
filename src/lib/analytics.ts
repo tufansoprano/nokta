@@ -121,6 +121,7 @@ export type AnalyticsEvent =
   | "owner_booking_no_show"
   | "admin_bookings_viewed"
   | "admin_booking_marked_spam"
+  | "admin_booking_answered_for_venue"
   | "owner_availability_viewed"
   | "owner_availability_settings_updated"
   | "owner_booking_window_added"

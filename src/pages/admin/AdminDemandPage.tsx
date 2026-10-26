@@ -17,7 +17,7 @@ import { DEFAULT_CITY } from "@/lib/cities";
 import { formatPartnerTier } from "@/lib/monetisationLabels";
 import { cn } from "@/lib/utils";
 import { formatAdminVenueEnquiryStatus, formatVenueEnquiryType } from "@/lib/venueEnquiryLabels";
-import { getAdminBookingRequests, markBookingRequestSpam, updateBookingRequestAdminNotes } from "@/services/adminBookingRequestService";
+import { answerBookingRequestForVenue, getAdminBookingRequests, markBookingRequestSpam, updateBookingRequestAdminNotes, type AdminBookingAnswer } from "@/services/adminBookingRequestService";
 import { getAdminVenueEnquiries, markVenueEnquiryResolved, updateVenueEnquiryAdminNotes } from "@/services/adminVenueEnquiryService";
 import type { BookingRequest } from "@/types/bookingRequests";
 import type { Venue } from "@/types/venue";
@@ -109,7 +109,8 @@ export function AdminDemandPage() {
     });
   }, [baseItems, kind, search, state, venuesById]);
 
-  const selected = visibleItems.find((item) => item.id === selectedId) ?? null;
+  // Resolved from every item, not the filtered list, so a link from a forwarding email opens whatever city or filter is set.
+  const selected = allItems.find((item) => item.id === selectedId) ?? null;
   useEffect(() => { setAdminNotes(selected?.adminNotes ?? ""); }, [selected?.id, selected?.adminNotes]);
 
   const metrics = useMemo(() => getMetrics(baseItems, venuesById), [baseItems, venuesById]);
@@ -142,6 +143,20 @@ export function AdminDemandPage() {
       if (markSpam) updateParams({ item: null });
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Could not update demand item.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function answerForVenue(answer: AdminBookingAnswer) {
+    if (!user || !selected || selected.kind !== "booking") return;
+    try {
+      setIsSaving(true);
+      setError(null);
+      const updated = await answerBookingRequestForVenue({ bookingRequestId: selected.id, adminUserId: user.id, answer });
+      setBookings((current) => current.map((item) => item.id === updated.id ? updated : item));
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Could not record the venue's answer.");
     } finally {
       setIsSaving(false);
     }
@@ -189,15 +204,15 @@ export function AdminDemandPage() {
           <aside className="flex flex-col gap-3">
             <section className="rounded-2xl bg-nokta-ink p-5 text-nokta-surface">
               <h2 className="font-brand text-lg font-bold leading-snug">{outreach.length} unclaimed venues have demand</h2>
-              <p className="mt-1.5 text-sm leading-relaxed text-nokta-surface/70">{outreach.reduce((total, row) => total + row.count, 0)} requests nobody can answer until those venues are claimed.</p>
+              <p className="mt-1.5 text-sm leading-relaxed text-nokta-surface/70">{outreach.reduce((total, row) => total + row.count, 0)} requests nokta has to pass on until those venues are claimed.</p>
               <Button className="mt-3 h-8 text-[13px]" disabled={!outreach.length} onClick={() => exportOutreachCsv(outreach)}>Export leads</Button>
             </section>
             <InfoCard title="Slowest to reply">
               {slowest.length ? slowest.map((row) => <div key={row.venueId} className="flex justify-between gap-3 py-1"><span className="truncate">{row.name}</span><strong className={cn("flex-none font-semibold", row.averageMs > 24 * 60 * 60 * 1000 && "text-nokta-warn-ink")}>{formatDuration(row.averageMs)}</strong></div>) : <p>No owner replies in this range.</p>}
               <p className="mt-2 border-t pt-2 border-nokta-border">Claimed venues only. Use this beside their plan in Commercial.</p>
             </InfoCard>
-            <InfoCard title="You can’t reply from here">
-              <p>Admin can add internal notes or mark spam. Customer replies stay with the venue, and customer PII is never sent to analytics.</p>
+            <InfoCard title="Answering for a venue">
+              <p>Only for unclaimed venues: pass the booking request on, then record their answer and the customer is emailed. Claimed venues answer for themselves. Customer PII is never sent to analytics.</p>
             </InfoCard>
           </aside>
         </div>
@@ -209,6 +224,8 @@ export function AdminDemandPage() {
             <div className="flex items-start justify-between gap-4"><div><TypeChip kind={selected.kind} /><h2 className="mt-2 font-brand text-xl font-bold">{selected.customerName}</h2><p className="mt-1 text-[13px] text-nokta-ink-muted">{venuesById[selected.venueId]?.name ?? selected.venueId} · {formatStatus(selected)}</p></div><Button variant="ghost" onClick={() => updateParams({ item: null })}>Close</Button></div>
             <dl className="mt-4 grid gap-3 rounded-xl border p-4 text-sm sm:grid-cols-2 border-nokta-border"><Detail label="Email" value={selected.customerEmail} /><Detail label="Phone" value={selected.customerPhone} /><Detail label="Request" value={selected.customerDetail} /><Detail label="Reference" value={selected.reference} /></dl>
             {selected.message ? <div className="mt-3 rounded-xl border p-4 border-nokta-border"><p className="text-[11px] font-semibold uppercase tracking-[1px] text-nokta-ink-muted">Customer message</p><p className="mt-2 whitespace-pre-wrap text-sm leading-[1.6]">{selected.message}</p></div> : null}
+            {selected.kind === "booking" && venuesById[selected.venueId] && !venuesById[selected.venueId].isClaimed ? <ForwardToVenuePanel key={selected.id} venue={venuesById[selected.venueId]} booking={selected.raw as BookingRequest} isSaving={isSaving} onAnswer={answerForVenue} /> : null}
+            {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
             <label className="mt-3 block"><span className="text-sm font-semibold">Internal admin note</span><Textarea value={adminNotes} onChange={(event) => setAdminNotes(event.target.value)} className="mt-2 min-h-20" /></label>
             <div className="mt-4 flex justify-end gap-2"><Button variant="outline" disabled={isSaving || selected.status === "spam"} onClick={() => saveNotes(true)}>Mark spam</Button><Button disabled={isSaving} onClick={() => saveNotes(false)}>{isSaving ? "Saving…" : "Save note"}</Button></div>
           </div>
@@ -221,6 +238,59 @@ export function AdminDemandPage() {
 function DemandTable({ items, venuesById, onOpen }: { items: DemandItem[]; venuesById: Record<string, Venue>; onOpen: (item: DemandItem) => void }) {
   if (!items.length) return <div className="rounded-2xl border bg-nokta-surface p-8 text-center text-sm text-nokta-ink-muted border-nokta-border">No demand matches these filters.</div>;
   return <div className="overflow-hidden rounded-xl border bg-nokta-surface border-nokta-border"><div className="hidden grid-cols-[1.5fr_92px_1fr_96px_104px_62px] gap-3 border-b bg-nokta-hover px-4 py-[9px] text-[11px] font-semibold uppercase tracking-[0.04em] text-nokta-ink-muted lg:grid border-nokta-border"><span>Venue</span><span>Type</span><span>Customer</span><span>Sent</span><span>Status</span><span /></div>{items.map((item) => { const venue = venuesById[item.venueId]; const overdue = isUnanswered(item) && ageMs(item) > 48 * 60 * 60 * 1000; return <button key={`${item.kind}-${item.id}`} type="button" onClick={() => onOpen(item)} className={cn("grid w-full gap-2 border-b border-nokta-divider-row px-4 py-3 text-left transition-colors hover:bg-nokta-hover-row last:border-b-0 lg:grid-cols-[1.5fr_92px_1fr_96px_104px_62px] lg:items-center lg:gap-3", overdue && "bg-nokta-warn-tint hover:bg-nokta-warn-tint", item.status === "spam" && "opacity-[0.62]")}><div><div className="truncate text-sm font-medium">{venue?.name ?? item.venueId}</div><div className={cn("mt-0.5 text-xs text-nokta-ink-muted", venue && !venue.isClaimed && "font-medium text-nokta-bad-ink")}>{venue && !venue.isClaimed ? "Unclaimed · nobody can reply" : venue ? `${venue.area} · ${formatPartnerTier(venue.partnerTier)}` : "Venue unavailable"}</div></div><TypeChip kind={item.kind} /><div className="min-w-0"><div className="truncate text-[13px] font-medium">{item.customerName}</div><div className="truncate text-xs text-nokta-ink-muted">{item.customerDetail}</div></div><span className="text-xs text-nokta-ink-muted">{formatAge(item.createdAt)}</span><StatusChip item={item} /><span className="text-[13px] font-medium text-nokta-accent-dark">Open</span></button>; })}</div>;
+}
+
+/**
+ * An unclaimed venue has nobody on nokta to answer, so the admin passes the request on
+ * and records what the venue said. Only a pending request can be answered.
+ */
+function ForwardToVenuePanel({ venue, booking, isSaving, onAnswer }: { venue: Venue; booking: BookingRequest; isSaving: boolean; onAnswer: (answer: AdminBookingAnswer) => void }) {
+  const [message, setMessage] = useState("");
+  const [isProposing, setIsProposing] = useState(false);
+  const [proposedDate, setProposedDate] = useState(booking.requestedDate);
+  const [proposedTime, setProposedTime] = useState(booking.requestedTime);
+  const hasContact = Boolean(venue.phone || venue.website || venue.instagram);
+
+  return (
+    <section className="mt-3 rounded-xl border border-nokta-warn-line bg-nokta-warn-tint p-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[1px] text-nokta-warn-ink">Unclaimed · pass this on</p>
+      {hasContact ? (
+        <div className="mt-2 flex flex-wrap gap-2 text-[13px]">
+          {venue.phone ? <a href={`tel:${venue.phone}`} className="rounded-lg border border-nokta-border bg-nokta-surface px-2.5 py-1 font-medium">{venue.phone}</a> : null}
+          {venue.website ? <a href={venue.website} target="_blank" rel="noreferrer noopener" className="rounded-lg border border-nokta-border bg-nokta-surface px-2.5 py-1 font-medium">Website</a> : null}
+          {venue.instagram ? <a href={venue.instagram} target="_blank" rel="noreferrer noopener" className="rounded-lg border border-nokta-border bg-nokta-surface px-2.5 py-1 font-medium">Instagram</a> : null}
+        </div>
+      ) : <p className="mt-2 text-[13px] text-nokta-ink-muted">No phone, website or Instagram on file for {venue.name}.</p>}
+
+      {booking.status === "pending" ? (
+        <div className="mt-3 space-y-2">
+          <span className="block text-sm font-semibold">Venue's answer</span>
+          <Textarea value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Optional message to the customer, sent as from the venue" className="min-h-16 bg-nokta-surface" />
+          {isProposing ? (
+            <div className="grid grid-cols-2 gap-2">
+              <Input type="date" aria-label="Suggested date" value={proposedDate} onChange={(event) => setProposedDate(event.target.value)} className="bg-nokta-surface" />
+              <Input type="time" aria-label="Suggested time" value={proposedTime} onChange={(event) => setProposedTime(event.target.value)} className="bg-nokta-surface" />
+            </div>
+          ) : null}
+          <div className="flex flex-wrap justify-end gap-2">
+            {isProposing ? (
+              <>
+                <Button variant="ghost" disabled={isSaving} onClick={() => setIsProposing(false)}>Back</Button>
+                <Button disabled={isSaving || !proposedDate || !proposedTime} onClick={() => onAnswer({ kind: "propose", proposedDate, proposedTime, message })}>Send suggested time</Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" disabled={isSaving} onClick={() => onAnswer({ kind: "decline", message })}>Declined</Button>
+                <Button variant="outline" disabled={isSaving} onClick={() => setIsProposing(true)}>Suggested another time</Button>
+                <Button disabled={isSaving} onClick={() => onAnswer({ kind: "accept", message })}>Accepted</Button>
+              </>
+            )}
+          </div>
+          <p className="text-xs text-nokta-ink-muted">The customer is emailed straight away.</p>
+        </div>
+      ) : <p className="mt-3 text-[13px] text-nokta-ink-muted">Answered: {formatBookingRequestStatus(booking.status)}.</p>}
+    </section>
+  );
 }
 
 function Metric({ label, value, sub, alert }: { label: string; value: string; sub: string; alert?: boolean }) { return <div className={cn("rounded-2xl border bg-nokta-surface px-4 py-[14px] border-nokta-border", alert && "border-nokta-warn-line bg-nokta-warn-tint")}><p className="text-xs text-nokta-ink-muted">{label}</p><p className="mt-1 text-[22px] font-semibold">{value}</p><p className="mt-0.5 text-xs text-nokta-ink-muted">{sub}</p></div>; }

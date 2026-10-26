@@ -65,6 +65,7 @@ const color = {
   accent: "#b3543c",
   accentDark: "#5c1e0f",
   chipTint: "#ffede9",
+  accentTint: "#ffdbd1",
   button: "#c45d3e",
 };
 
@@ -254,7 +255,7 @@ function renderEmail(content: EmailContent): RenderedEmail {
   const action = content.action?.url ? content.action : null;
 
   const messageHtml = message && content.message
-    ? `<tr><td style="padding:20px 0 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;background:${color.chipTint};border-left:3px solid ${color.accent};border-radius:12px"><tr><td style="padding:14px 16px"><p style="margin:0 0 6px;font-size:11px;line-height:1.4;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:${color.accentDark}">${escapeHtml(content.message.label)}</p><p style="margin:0;font-size:15px;line-height:1.6;color:${color.ink}">${escapeHtml(message).replace(/\n/g, "<br>")}</p></td></tr></table></td></tr>`
+    ? `<tr><td style="padding:20px 0 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;background:${color.chipTint};border:1px solid ${color.accentTint};border-radius:12px"><tr><td style="padding:14px 16px"><p style="margin:0 0 6px;font-size:11px;line-height:1.4;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:${color.accentDark}">${escapeHtml(content.message.label)}</p><p style="margin:0;font-size:15px;line-height:1.6;color:${color.ink}">${escapeHtml(message).replace(/\n/g, "<br>")}</p></td></tr></table></td></tr>`
     : "";
 
   const sectionsHtml = sections.map((section) => {

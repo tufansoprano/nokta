@@ -68,7 +68,7 @@ export const RECOMMEND_QUESTIONS: RecommendQuestion[] = [
     key: "distance",
     eyebrow: "Last one",
     title: "How far will you travel?",
-    hint: "Using {neighbourhood} as your location.",
+    hint: "Distances are from {neighbourhood}.",
     options: [
       { value: "walk", label: "Walking distance", sub: "Under a mile" },
       { value: "short", label: "Short trip", sub: "Up to three miles" },

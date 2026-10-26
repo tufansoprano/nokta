@@ -17,3 +17,7 @@ venue-outreach-*
 # Build-time output (homepage seed, MCP endpoint bundle)
 .generated/
 server-dist/
+
+# Playwright output
+test-results/
+playwright-report/

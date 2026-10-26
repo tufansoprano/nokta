@@ -198,3 +198,35 @@ export const FOOD_HYGIENE_LINK_STATUS_LABELS: Record<VenueFoodHygiene["linkStatu
   unmatched: "No official record found",
   unlinked: "Marked as having no official record",
 };
+
+/** What the venue page shows for a venue's rating. */
+export interface FoodHygieneDisplay {
+  heading: string;
+  result: string;
+  /** "Inspected 7 October 2021", or null when the official record has no date. */
+  inspectedLabel: string | null;
+  officialUrl: string;
+  officialLinkLabel: string;
+}
+
+/**
+ * The venue page's rating, or null when there is nothing to show: no record, or
+ * one officially "Awaiting inspection" or "Exempt". Every score is shown as given;
+ * Scottish venues keep FHIS's own heading and wording.
+ */
+export function getFoodHygieneDisplay(hygiene: VenueFoodHygiene | null): FoodHygieneDisplay | null {
+  if (!hygiene?.rating || !hygiene.scheme || !hygiene.officialUrl) return null;
+
+  const isScotland = hygiene.scheme === "FHIS";
+  return {
+    heading: isScotland ? "Food hygiene inspection" : "Food hygiene rating",
+    result: formatFoodHygieneRating(hygiene.rating),
+    inspectedLabel: hygiene.ratingDate ? `Inspected ${formatInspectionDate(hygiene.ratingDate)}` : null,
+    officialUrl: hygiene.officialUrl,
+    officialLinkLabel: isScotland ? "Official inspection result" : "Official rating",
+  };
+}
+
+function formatInspectionDate(date: string): string {
+  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`));
+}

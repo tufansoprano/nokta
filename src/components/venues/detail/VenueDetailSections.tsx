@@ -1,13 +1,16 @@
 import { VenueMap } from "@/components/map/VenueMap";
 import { ReviewSection } from "@/components/reviews/ReviewSection";
+import { getFoodHygieneDisplay } from "@/lib/foodHygiene";
 import { cn } from "@/lib/utils";
 import { getGroupedOpeningHours, getTodayOpeningLabel } from "@/lib/openingHours";
 import { getVenueAmenities, type VenueAmenityIcon } from "@/lib/venueAmenities";
 import { formatPenceAsPrice } from "@/lib/venueMenuValidation";
+import { getPublicVenueFoodHygiene } from "@/services/venueFoodHygieneService";
 import { getPublicVenueMenu } from "@/services/venueMenuService";
 import type { Venue } from "@/types/venue";
 import type { VenueMenu } from "@/types/venueMenu";
-import { Armchair, Clock, Martini, Umbrella, Users, Utensils } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Armchair, Clock, ExternalLink, Martini, Umbrella, Users, Utensils } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { VenueImage } from "@/components/venues/VenueImage";
@@ -126,8 +129,8 @@ export function ReviewsTab({ venue }: { venue: Venue }) {
 }
 
 /**
- * The rail's second card: today's hours, the grouped week, the address, the map and the
- * provenance line. It replaces the old "Key details" and "Plan your visit" blocks, and
+ * The rail's second card: today's hours, the grouped week, the address, the map, the
+ * food hygiene rating and the provenance line. It replaces the old "Key details" and "Plan your visit" blocks, and
  * stays put as the main column's tab changes.
  */
 export function VenueHoursLocationCard({ venue, className }: { venue: Venue; className?: string }) {
@@ -164,11 +167,36 @@ export function VenueHoursLocationCard({ venue, className }: { venue: Venue; cla
         <VenueMap venues={[venue]} selectedVenueId={venue.id} city={venue.city} className="h-[150px] rounded-none border-0 [&_.leaflet-container]:!min-h-[150px] [&_.leaflet-control-container]:relative [&_.leaflet-control-container]:z-0 md:[&_.leaflet-container]:!min-h-[150px]" />
       </div>
 
+      <FoodHygieneRow venueId={venue.id} />
+
       <div className="mt-[13px] flex flex-wrap items-center gap-2 text-[12.5px] text-nokta-ink-muted">
         {venue.verificationStatus === "verified" ? <span className="inline-flex h-[22px] items-center rounded-full bg-[oklch(0.95_0.05_150)] px-[9px] text-[11px] font-semibold text-[oklch(0.4_0.1_150)]">Verified</span> : null}
         {venue.lastVerifiedAt ? `Checked ${formatVerifiedDate(venue.lastVerifiedAt)} · details can change` : "Details can change"}
       </div>
     </section>
+  );
+}
+
+/** The official rating with its inspection date and source; absent when the venue has no rating or the read fails. */
+function FoodHygieneRow({ venueId }: { venueId: string }) {
+  const { data } = useQuery({ queryKey: ["venue-food-hygiene", venueId], queryFn: () => getPublicVenueFoodHygiene(venueId) });
+  const display = getFoodHygieneDisplay(data ?? null);
+  if (!display) return null;
+
+  return (
+    <div data-testid="venue-food-hygiene" className="mt-[15px] border-t border-nokta-border pt-[15px]">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[11.5px] font-semibold uppercase tracking-[0.04em] text-nokta-ink-muted">{display.heading}</p>
+        <span className="text-[13px] font-semibold text-nokta-ink">{display.result}</span>
+      </div>
+      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[12.5px]">
+        {display.inspectedLabel ? <span className="text-nokta-ink-muted">{display.inspectedLabel}</span> : null}
+        <a href={display.officialUrl} target="_blank" rel="noreferrer noopener" className="inline-flex min-h-8 items-center gap-1 font-medium text-clay-accent hover:text-clay-accent-hover hover:underline">
+          {display.officialLinkLabel}
+          <ExternalLink className="h-3 w-3" strokeWidth={2} aria-hidden="true" />
+        </a>
+      </div>
+    </div>
   );
 }
 

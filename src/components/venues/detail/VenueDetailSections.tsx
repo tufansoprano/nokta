@@ -1,7 +1,8 @@
-import { VenueMap } from "@/components/map/VenueMap";
 import { ReviewSection } from "@/components/reviews/ReviewSection";
 import { getFoodHygieneDisplay } from "@/lib/foodHygiene";
+import { hasValidCoordinates } from "@/lib/map";
 import { cn } from "@/lib/utils";
+import { getVenueAddressLines, getVenueDirectionsUrl } from "@/lib/venueAddress";
 import { getGroupedOpeningHours, getTodayOpeningLabel } from "@/lib/openingHours";
 import { getVenueAmenities, type VenueAmenityIcon } from "@/lib/venueAmenities";
 import { formatPenceAsPrice } from "@/lib/venueMenuValidation";
@@ -10,8 +11,8 @@ import { getPublicVenueMenu } from "@/services/venueMenuService";
 import type { Venue } from "@/types/venue";
 import type { VenueMenu } from "@/types/venueMenu";
 import { useQuery } from "@tanstack/react-query";
-import { Armchair, Clock, ExternalLink, Martini, Umbrella, Users, Utensils } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Armchair, Clock, ExternalLink, Martini, Navigation, Umbrella, Users, Utensils } from "lucide-react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { VenueImage } from "@/components/venues/VenueImage";
 
@@ -25,6 +26,9 @@ const AMENITY_ICONS: Record<VenueAmenityIcon, typeof Clock> = {
 };
 
 const MENU_PREVIEW_LIMIT = 3;
+
+// MapLibre is large; load it only when a venue page renders its location card.
+const VenueLocationMap = lazy(async () => ({ default: (await import("@/components/map/VenueLocationMap")).VenueLocationMap }));
 
 export function OverviewTab({ venue, similarVenues, onOpenMenu }: { venue: Venue; similarVenues: Venue[]; onOpenMenu: () => void }) {
   const amenities = getVenueAmenities(venue);
@@ -129,7 +133,7 @@ export function ReviewsTab({ venue }: { venue: Venue }) {
 }
 
 /**
- * The rail's second card: today's hours, the grouped week, the address, the map, the
+ * The rail's second card: today's hours, the grouped week, the map, the address, the
  * food hygiene rating and the provenance line. It replaces the old "Key details" and "Plan your visit" blocks, and
  * stays put as the main column's tab changes.
  */
@@ -157,15 +161,7 @@ export function VenueHoursLocationCard({ venue, className }: { venue: Venue; cla
         </>
       ) : null}
 
-      <p className="text-[13.5px] leading-[1.6] text-nokta-ink-subtle">
-        {venue.address}
-        <br />
-        {venue.city} {venue.postcode}
-      </p>
-
-      <div className="mt-[11px] overflow-hidden rounded-xl border border-nokta-border">
-        <VenueMap venues={[venue]} selectedVenueId={venue.id} city={venue.city} className="h-[150px] rounded-none border-0 [&_.leaflet-container]:!min-h-[150px] [&_.leaflet-control-container]:relative [&_.leaflet-control-container]:z-0 md:[&_.leaflet-container]:!min-h-[150px]" />
-      </div>
+      <VenueLocation venue={venue} />
 
       <FoodHygieneRow venueId={venue.id} />
 
@@ -174,6 +170,33 @@ export function VenueHoursLocationCard({ venue, className }: { venue: Venue; cla
         {venue.lastVerifiedAt ? `Checked ${formatVerifiedDate(venue.lastVerifiedAt)} · details can change` : "Details can change"}
       </div>
     </section>
+  );
+}
+
+/** Map pin, then the address with a directions link; the map is left out when the venue has no coordinates. */
+function VenueLocation({ venue }: { venue: Venue }) {
+  const { street, locality } = getVenueAddressLines(venue);
+
+  return (
+    <div>
+      {hasValidCoordinates(venue) ? (
+        <div className="mb-3 h-[180px] overflow-hidden rounded-xl border border-nokta-border bg-nokta-map-bg">
+          <Suspense fallback={null}>
+            <VenueLocationMap latitude={venue.latitude} longitude={venue.longitude} label={venue.name} />
+          </Suspense>
+        </div>
+      ) : null}
+      <div className="flex items-start justify-between gap-3">
+        <address className="min-w-0 text-[13.5px] not-italic leading-[1.5]">
+          {street ? <span className="block font-medium text-nokta-ink">{street}</span> : null}
+          <span className={cn("block", street ? "text-nokta-ink-muted" : "font-medium text-nokta-ink")}>{locality}</span>
+        </address>
+        <a href={getVenueDirectionsUrl(venue)} target="_blank" rel="noreferrer noopener" aria-label={`Directions to ${venue.name} in Google Maps`} className="inline-flex min-h-8 flex-none items-center gap-1.5 text-[12.5px] font-medium text-clay-accent hover:text-clay-accent-hover hover:underline">
+          <Navigation className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+          Directions
+        </a>
+      </div>
+    </div>
   );
 }
 

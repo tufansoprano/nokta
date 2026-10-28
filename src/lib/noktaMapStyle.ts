@@ -158,6 +158,8 @@ export function applyMapTheme(map: MapLibreMap, dark: boolean) {
       }
     }
   }
+  // The venue page's single-pin map has no dot layer.
+  if (!map.getLayer("venue-dots")) return;
   map.setPaintProperty("venue-dots", "circle-color", ["case", ["get", "isOpen"], dark ? "#f1e8de" : "#2a211b", dark ? "#8a7a6a" : "#b3a596"]);
   map.setPaintProperty("venue-dots", "circle-stroke-color", dark ? "#171513" : "#f7f1e8");
 }

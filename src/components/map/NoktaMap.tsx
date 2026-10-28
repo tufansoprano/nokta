@@ -1,3 +1,4 @@
+import type { FeatureCollection } from "geojson";
 import maplibregl, { type GeoJSONSource, type Map as MapLibreMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef } from "react";
@@ -214,7 +215,7 @@ export function NoktaMap({
   );
 }
 
-function toFeatureCollection(points: NoktaMapPoint[]): GeoJSON.FeatureCollection {
+function toFeatureCollection(points: NoktaMapPoint[]): FeatureCollection {
   return {
     type: "FeatureCollection",
     features: points.map((point) => ({

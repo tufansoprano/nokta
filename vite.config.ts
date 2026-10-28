@@ -39,11 +39,10 @@ export default defineConfig({
     rollupOptions: {
       output: {
         // Match on the package directory, not a bare substring of the whole path:
-        // "leaflet" also appears inside "react-leaflet", and a home directory or
-        // dependency path containing "react" would otherwise land in vendor-react.
-        // Leaflet is deliberately left unnamed so it stays inside the lazy route
-        // chunks that use it, instead of being hoisted into the entry's preload
-        // graph and making its stylesheet render-blocking on every page.
+        // a home directory or dependency path containing "react" would otherwise
+        // land in vendor-react. MapLibre is deliberately left unnamed so it stays
+        // inside the lazy chunks that use it, instead of being hoisted into the
+        // entry's preload graph and making its stylesheet render-blocking on every page.
         manualChunks(id) {
           const match = id.match(/node_modules\/(?:\.pnpm\/)?((?:@[^/]+\/)?[^/]+)/);
           if (!match) return;

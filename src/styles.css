@@ -261,57 +261,6 @@
   }
 }
 
-/*
- * Leaflet ships its own popup chrome — Helvetica, a 12px radius, a hard
- * rgba(0,0,0,.4) shadow and no border — which reads as a foreign object next to
- * a nokta card. These overrides restyle the wrapper and tip to match VenueCard,
- * and reset the anchor styling Leaflet applies to every link inside a popup,
- * which was flattening the "View venue" button's label. The popup is opened with
- * closeButton={false}, so there is nothing to style there.
- *
- * Each override is scoped under .leaflet-container so it outranks Leaflet's own
- * single-class rules: its stylesheet ships in the lazy map chunk and therefore
- * parses after this one, so load order alone would not win.
- */
-.leaflet-container .leaflet-popup-content-wrapper {
-  padding: 0;
-  border-radius: 1rem;
-  border: 1px solid var(--color-nokta-border);
-  background: var(--color-nokta-surface);
-  color: var(--color-nokta-ink);
-  font-family: var(--font-primary);
-  box-shadow: 0 12px 30px -16px oklch(0.2 0.02 40 / 0.35);
-}
-
-.leaflet-container .leaflet-popup-content {
-  margin: 0;
-  width: auto !important;
-  font-size: inherit;
-  line-height: inherit;
-}
-
-.leaflet-container .leaflet-popup-tip {
-  border: 1px solid var(--color-nokta-border);
-  background: var(--color-nokta-surface);
-  box-shadow: none;
-}
-
-/*
- * Leaflet sets `.leaflet-container a { color: #0078A8 }`, which at (0,1,1)
- * outranks a Tailwind colour utility like `text-white` at (0,1,0) — so the CTA
- * label rendered Leaflet blue. Reset popup links to inherit at equal specificity,
- * and re-assert the CTA's own colour at the same weight.
- */
-.leaflet-container .leaflet-popup-content a {
-  color: inherit;
-  text-decoration: none;
-}
-
-/* Tailwind's colour utilities are single-class, so raise them to match. */
-.leaflet-container .leaflet-popup-content a.text-white {
-  color: var(--color-white);
-}
-
 /* nokta map (MapLibre): the selected venue's pill and the "you are here" dot. */
 .nokta-map-pill {
   pointer-events: none;
@@ -324,6 +273,16 @@
   font-weight: 600;
   color: var(--color-nokta-surface);
   box-shadow: 0 6px 14px -6px rgb(42 33 27 / 0.5);
+}
+
+/* The venue page's location pin: the clay "selected" dot from the home map. */
+.nokta-map-pin {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: oklch(0.56 0.13 35);
+  border: 2.5px solid #fff;
+  box-shadow: 0 0 0 9px oklch(0.56 0.13 35 / 0.16), 0 2px 6px rgb(42 33 27 / 0.35);
 }
 
 .nokta-map-you {
@@ -371,10 +330,6 @@
 :root[data-theme="dark"] .nokta-map .maplibregl-ctrl-attrib {
   background: rgb(33 30 27 / 0.9);
   color: var(--color-nokta-ink-muted);
-}
-
-:root[data-theme="dark"] .leaflet-tile-pane {
-  filter: invert(1) hue-rotate(180deg) brightness(0.8) saturate(0.6);
 }
 
 /*

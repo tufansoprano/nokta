@@ -1,5 +1,6 @@
-import { Component, type ReactNode } from "react";
+import { Component, type ErrorInfo, type ReactNode } from "react";
 import { RouteErrorState } from "@/components/state/RouteErrorState";
+import { reportError } from "@/lib/errorReporting";
 
 interface AppErrorBoundaryProps {
   children: ReactNode;
@@ -16,6 +17,10 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
 
   static getDerivedStateFromError(error: Error): AppErrorBoundaryState {
     return { error };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    reportError(error, { source: "app_error_boundary", component_stack: info.componentStack ?? null });
   }
 
   render() {

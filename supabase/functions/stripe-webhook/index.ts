@@ -84,6 +84,15 @@ function mapStripeSubscriptionStatusToNoktaStatus(status: string) {
   }
 }
 
+/**
+ * Supabase returns write errors instead of throwing them. A write that fails
+ * silently would answer Stripe with 200 and the event would never be retried,
+ * so every write goes through here and a failure fails the whole event.
+ */
+function assertWrite(result: { error: { message: string } | null }, step: string) {
+  if (result.error) throw new Error(`${step} failed: ${result.error.message}`);
+}
+
 function unixToIso(value: number | null | undefined) {
   return value ? new Date(value * 1000).toISOString() : null;
 }
@@ -92,11 +101,24 @@ Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const signature = request.headers.get("stripe-signature");
-  if (!signature) return jsonResponse({ error: "Missing Stripe signature." }, { status: 400 });
+  if (!signature) {
+    console.log("stripe-webhook rejected", { reason: "missing_signature" });
+    return jsonResponse({ error: "Missing Stripe signature." }, { status: 400 });
+  }
+
+  let verified: Awaited<ReturnType<typeof constructStripeEvent>>;
+  try {
+    verified = await constructStripeEvent({ body: await request.text(), signature });
+  } catch (error) {
+    console.error("stripe-webhook rejected", { reason: "invalid_signature" });
+    const message = error instanceof Error ? error.message : "Could not verify Stripe webhook signature.";
+    return jsonResponse({ error: message }, { status: 400 });
+  }
+
+  const { event, stripe, stripeMode } = verified;
+  console.log("stripe-webhook received", { eventId: event.id, type: event.type, stripeMode });
 
   try {
-    const body = await request.text();
-    const { event, stripe, stripeMode } = await constructStripeEvent({ body, signature });
     const supabase = createAdminClient();
 
     if (event.type === "checkout.session.completed") {
@@ -106,10 +128,13 @@ Deno.serve(async (request) => {
 
     if (event.type === "checkout.session.expired") {
       const session = event.data.object as Stripe.Checkout.Session;
-      await supabase
-        .from("stripe_checkout_sessions")
-        .update({ status: "expired" })
-        .eq("stripe_checkout_session_id", session.id);
+      assertWrite(
+        await supabase
+          .from("stripe_checkout_sessions")
+          .update({ status: "expired" })
+          .eq("stripe_checkout_session_id", session.id),
+        "expire checkout session",
+      );
     }
 
     if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated") {
@@ -119,44 +144,59 @@ Deno.serve(async (request) => {
     if (event.type === "customer.subscription.deleted") {
       const subscription = event.data.object as Stripe.Subscription;
       const venueId = subscription.metadata.venueId;
-      await supabase
-        .from("venue_subscriptions")
-        .update({
-          status: "cancelled",
-          cancelled_at: new Date().toISOString(),
-          cancel_at_period_end: false,
-          last_stripe_event_id: event.id,
-          last_synced_at: new Date().toISOString(),
-        })
-        .eq("billing_subscription_id", subscription.id);
+      assertWrite(
+        await supabase
+          .from("venue_subscriptions")
+          .update({
+            status: "cancelled",
+            cancelled_at: new Date().toISOString(),
+            cancel_at_period_end: false,
+            last_stripe_event_id: event.id,
+            last_synced_at: new Date().toISOString(),
+          })
+          .eq("billing_subscription_id", subscription.id),
+        "cancel venue subscription",
+      );
 
       if (venueId) {
-        await supabase
-          .from("venues")
-          .update({
-            partner_tier: "none",
-            monetisation_status: "churned",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", venueId);
+        assertWrite(
+          await supabase
+            .from("venues")
+            .update({
+              partner_tier: "none",
+              monetisation_status: "churned",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", venueId),
+          "downgrade venue",
+        );
+      } else {
+        console.log("stripe-webhook subscription deleted without venue", { eventId: event.id, subscriptionId: subscription.id });
       }
     }
 
     if (event.type === "invoice.payment_failed") {
       const invoice = event.data.object as Stripe.Invoice;
       const subscriptionId = typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
+      console.log("stripe-webhook payment failed", { eventId: event.id, invoiceId: invoice.id, subscriptionId: subscriptionId ?? null });
       if (subscriptionId) {
-        await supabase
-          .from("venue_subscriptions")
-          .update({ status: "past_due", last_stripe_event_id: event.id, last_synced_at: new Date().toISOString() })
-          .eq("billing_subscription_id", subscriptionId);
+        assertWrite(
+          await supabase
+            .from("venue_subscriptions")
+            .update({ status: "past_due", last_stripe_event_id: event.id, last_synced_at: new Date().toISOString() })
+            .eq("billing_subscription_id", subscriptionId),
+          "mark subscription past due",
+        );
       }
     }
 
+    console.log("stripe-webhook handled", { eventId: event.id, type: event.type });
     return jsonResponse({ received: true });
   } catch (error) {
+    // A 500 makes Stripe retry the event, and every write above is safe to repeat.
     const message = error instanceof Error ? error.message : "Could not handle Stripe webhook.";
-    return jsonResponse({ error: message }, { status: 400 });
+    console.error("stripe-webhook failed", { eventId: event.id, type: event.type, reason: message });
+    return jsonResponse({ error: message }, { status: 500 });
   }
 });
 
@@ -171,18 +211,24 @@ async function handleCheckoutCompleted(input: {
   const customerId = typeof input.session.customer === "string" ? input.session.customer : input.session.customer?.id;
   const venueId = input.session.metadata?.venueId;
 
-  await input.supabase
-    .from("stripe_checkout_sessions")
-    .update({
-      status: "completed",
-      stripe_customer_id: customerId ?? null,
-      stripe_subscription_id: subscriptionId ?? null,
-      stripe_mode: input.stripeMode,
-      completed_at: new Date().toISOString(),
-    })
-    .eq("stripe_checkout_session_id", input.session.id);
+  assertWrite(
+    await input.supabase
+      .from("stripe_checkout_sessions")
+      .update({
+        status: "completed",
+        stripe_customer_id: customerId ?? null,
+        stripe_subscription_id: subscriptionId ?? null,
+        stripe_mode: input.stripeMode,
+        completed_at: new Date().toISOString(),
+      })
+      .eq("stripe_checkout_session_id", input.session.id),
+    "complete checkout session",
+  );
 
-  if (!subscriptionId || !venueId) return;
+  if (!subscriptionId || !venueId) {
+    console.error("stripe-webhook checkout missing subscription or venue", { eventId: input.eventId, sessionId: input.session.id, hasSubscription: Boolean(subscriptionId), hasVenue: Boolean(venueId) });
+    return;
+  }
   const subscription = await input.stripe.subscriptions.retrieve(subscriptionId);
   await syncSubscription({ supabase: input.supabase, eventId: input.eventId, subscription, fallbackVenueId: venueId, stripeMode: input.stripeMode });
 }
@@ -201,7 +247,11 @@ async function syncSubscription(input: {
   const plan = getPlanFromStripePriceId(priceId, stripeMode);
   const venueId = input.subscription.metadata.venueId ?? input.fallbackVenueId;
 
-  if (!plan || !venueId) return;
+  // A paid subscription that can't be matched to a plan or venue grants nothing, so it has to be visible.
+  if (!plan || !venueId) {
+    console.error("stripe-webhook subscription not synced", { eventId: input.eventId, subscriptionId: input.subscription.id, priceId, stripeMode, hasPlan: Boolean(plan), hasVenue: Boolean(venueId) });
+    return;
+  }
 
   const customerId = typeof input.subscription.customer === "string" ? input.subscription.customer : input.subscription.customer.id;
   const periodStart = item?.current_period_start ?? input.subscription.current_period_start;
@@ -210,7 +260,7 @@ async function syncSubscription(input: {
   const hasPaidAccess = noktaStatus === "active" || noktaStatus === "trial" || noktaStatus === "past_due";
   const cancelsAtPeriodEnd = input.subscription.cancel_at_period_end || Boolean(input.subscription.cancel_at);
 
-  await input.supabase.from("venue_subscriptions").upsert(
+  assertWrite(await input.supabase.from("venue_subscriptions").upsert(
     {
       venue_id: venueId,
       plan,
@@ -230,14 +280,19 @@ async function syncSubscription(input: {
       updated_by: null,
     },
     { onConflict: "venue_id" },
+  ), "upsert venue subscription");
+
+  assertWrite(
+    await input.supabase
+      .from("venues")
+      .update({
+        partner_tier: hasPaidAccess ? plan : "none",
+        monetisation_status: noktaStatus === "cancelled" ? "churned" : hasPaidAccess ? "paying" : "not-contacted",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", venueId),
+    "update venue tier",
   );
 
-  await input.supabase
-    .from("venues")
-    .update({
-      partner_tier: hasPaidAccess ? plan : "none",
-      monetisation_status: noktaStatus === "cancelled" ? "churned" : hasPaidAccess ? "paying" : "not-contacted",
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", venueId);
+  console.log("stripe-webhook subscription synced", { eventId: input.eventId, subscriptionId: input.subscription.id, venueId, plan, status: noktaStatus });
 }

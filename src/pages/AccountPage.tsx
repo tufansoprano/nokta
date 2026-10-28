@@ -21,6 +21,7 @@ import type { BookingRequest } from "@/types/bookingRequests";
 import type { Venue } from "@/types/venue";
 import type { VenueClaimRequest } from "@/types/venueClaims";
 import type { VenueEnquiry } from "@/types/venueEnquiries";
+import { reportError } from "@/lib/errorReporting";
 
 type IconType = ComponentType<{ className?: string }>;
 
@@ -106,7 +107,8 @@ export function AccountPage() {
     try {
       await signOut();
       navigate("/");
-    } catch {
+    } catch (caughtError) {
+      reportError(caughtError, { source: "sign_out" });
       setError("Couldn't sign you out. Check your connection and try again.");
     } finally {
       setIsSigningOut(false);

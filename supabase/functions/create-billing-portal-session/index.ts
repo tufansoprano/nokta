@@ -118,7 +118,10 @@ Deno.serve(async (request) => {
     const stripeMode = (subscription.stripe_mode as StripeMode | null) ?? getStripeModeForRequest(request);
     const stripeSecretKey = getStripeSecretKey(stripeMode);
     const appUrl = getAppUrlForRequest(request, stripeMode);
-    if (!stripeSecretKey || !appUrl) return jsonResponse({ error: "Stripe billing portal is not configured." }, { status: 500 });
+    if (!stripeSecretKey || !appUrl) {
+      console.error("create-billing-portal-session not configured", { stripeMode, hasSecretKey: Boolean(stripeSecretKey), hasAppUrl: Boolean(appUrl) });
+      return jsonResponse({ error: "Stripe billing portal is not configured." }, { status: 500 });
+    }
 
     const stripe = new Stripe(stripeSecretKey, { apiVersion: "2026-08-26.dahlia" });
     const portalSession = await stripe.billingPortal.sessions.create({
@@ -126,9 +129,11 @@ Deno.serve(async (request) => {
       return_url: `${appUrl}/owner/billing?portal_return=1`,
     });
 
+    console.log("create-billing-portal-session created", { venueId: venue.id, stripeMode });
     return jsonResponse({ url: portalSession.url });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not create billing portal session.";
+    console.error("create-billing-portal-session failed", { reason: message });
     return jsonResponse({ error: message }, { status: 500 });
   }
 });

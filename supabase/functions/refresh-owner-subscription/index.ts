@@ -93,14 +93,20 @@ Deno.serve(async (request) => {
 
     const stripeMode = (subscriptionRow.stripe_mode === "test" ? "test" : "live") as StripeMode;
     const stripeSecretKey = getStripeSecretKey(stripeMode);
-    if (!stripeSecretKey) return jsonResponse({ error: "Stripe secret key is not configured for this mode." }, { status: 500 });
+    if (!stripeSecretKey) {
+      console.error("refresh-owner-subscription not configured", { reason: "missing_secret_key", stripeMode });
+      return jsonResponse({ error: "Stripe secret key is not configured for this mode." }, { status: 500 });
+    }
 
     const stripe = new Stripe(stripeSecretKey, { apiVersion: "2026-08-26.dahlia" });
     const stripeSubscription = await stripe.subscriptions.retrieve(subscriptionRow.billing_subscription_id);
     const item = stripeSubscription.items.data[0];
     const priceId = item?.price.id ?? null;
     const plan = getPlanFromStripePriceId(priceId, stripeMode);
-    if (!plan) return jsonResponse({ error: "Could not map Stripe price to a Nokta plan." }, { status: 400 });
+    if (!plan) {
+      console.error("refresh-owner-subscription unknown price", { venueId: venue.id, subscriptionId: stripeSubscription.id, priceId, stripeMode });
+      return jsonResponse({ error: "Could not map Stripe price to a Nokta plan." }, { status: 400 });
+    }
 
     const status = mapStripeSubscriptionStatusToNoktaStatus(stripeSubscription.status);
     const hasPaidAccess = status === "active" || status === "trial" || status === "past_due";
@@ -108,7 +114,7 @@ Deno.serve(async (request) => {
     const productId = typeof item?.price.product === "string" ? item.price.product : item?.price.product?.id ?? null;
     const cancelsAtPeriodEnd = stripeSubscription.cancel_at_period_end || Boolean(stripeSubscription.cancel_at);
 
-    await supabase.from("venue_subscriptions").update({
+    const { error: subscriptionUpdateError } = await supabase.from("venue_subscriptions").update({
       plan,
       status,
       billing_provider: "stripe",
@@ -123,16 +129,20 @@ Deno.serve(async (request) => {
       last_synced_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }).eq("venue_id", venue.id);
+    if (subscriptionUpdateError) throw subscriptionUpdateError;
 
-    await supabase.from("venues").update({
+    const { error: venueUpdateError } = await supabase.from("venues").update({
       partner_tier: hasPaidAccess ? plan : "none",
       monetisation_status: status === "cancelled" ? "churned" : hasPaidAccess ? "paying" : "not-contacted",
       updated_at: new Date().toISOString(),
     }).eq("id", venue.id);
+    if (venueUpdateError) throw venueUpdateError;
 
+    console.log("refresh-owner-subscription refreshed", { venueId: venue.id, subscriptionId: stripeSubscription.id, plan, status });
     return jsonResponse({ refreshed: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not refresh subscription.";
+    console.error("refresh-owner-subscription failed", { reason: message });
     return jsonResponse({ error: message }, { status: 500 });
   }
 });

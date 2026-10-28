@@ -34,6 +34,7 @@ export function initPostHog() {
   // a phone. The cost: replays start a few seconds in, and a bounce inside that window
   // sends nothing.
   posthogLoading = true;
+  catchEarlyErrors();
   const loadPostHog = () => {
     void import("posthog-js").then(({ default: client }) => {
       posthog = client;
@@ -41,14 +42,17 @@ export function initPostHog() {
         api_host: host || "https://eu.i.posthog.com",
         capture_pageview: false,
         autocapture: false,
+        capture_exceptions: true,
         loaded: () => {
           posthogInitialised = true;
+          releaseEarlyErrors();
           // Stamped on every event, so PostHog agrees with the Supabase side.
           client.register({ environment: getAnalyticsEnvironment() });
           for (const action of pendingActions.splice(0)) action(client);
         },
       });
     }).catch(() => {
+      releaseEarlyErrors();
       posthogLoading = false;
       pendingActions.length = 0;
     });
@@ -65,6 +69,33 @@ function withPostHog(action: (client: PostHogClient) => void) {
   if (!posthogLoading) return;
   if (posthogInitialised && posthog) action(posthog);
   else pendingActions.push(action);
+}
+
+/**
+ * The SDK's own exception autocapture only starts once it has loaded, a few
+ * seconds in. Errors thrown before that are held here and sent once it is up,
+ * so a crash on first paint is not the one crash nobody hears about.
+ */
+function onEarlyError(event: ErrorEvent) {
+  capturePostHogException(event.error ?? event.message, { source: "early_window_error" });
+}
+
+function onEarlyRejection(event: PromiseRejectionEvent) {
+  capturePostHogException(event.reason, { source: "early_unhandled_rejection" });
+}
+
+function catchEarlyErrors() {
+  window.addEventListener("error", onEarlyError);
+  window.addEventListener("unhandledrejection", onEarlyRejection);
+}
+
+function releaseEarlyErrors() {
+  window.removeEventListener("error", onEarlyError);
+  window.removeEventListener("unhandledrejection", onEarlyRejection);
+}
+
+export function capturePostHogException(error: unknown, properties?: Record<string, unknown>) {
+  withPostHog((client) => client.captureException(error, properties));
 }
 
 export function capturePostHogEvent(eventName: string, properties?: Record<string, unknown>) {

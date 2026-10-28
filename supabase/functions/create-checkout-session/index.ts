@@ -122,11 +122,17 @@ Deno.serve(async (request) => {
 
     const stripeMode = getStripeModeForRequest(request);
     const priceId = getStripePriceIdForPlanAndMode(plan, stripeMode);
-    if (!priceId) return jsonResponse({ error: "Stripe price ID is not configured for this plan." }, { status: 500 });
+    if (!priceId) {
+      console.error("create-checkout-session not configured", { reason: "missing_price_id", plan, stripeMode });
+      return jsonResponse({ error: "Stripe price ID is not configured for this plan." }, { status: 500 });
+    }
 
     const stripeSecretKey = getStripeSecretKey(stripeMode);
     const appUrl = getAppUrlForRequest(request, stripeMode);
-    if (!stripeSecretKey || !appUrl) return jsonResponse({ error: "Stripe checkout is not configured." }, { status: 500 });
+    if (!stripeSecretKey || !appUrl) {
+      console.error("create-checkout-session not configured", { stripeMode, hasSecretKey: Boolean(stripeSecretKey), hasAppUrl: Boolean(appUrl) });
+      return jsonResponse({ error: "Stripe checkout is not configured." }, { status: 500 });
+    }
 
     const stripe = new Stripe(stripeSecretKey, { apiVersion: "2026-08-26.dahlia" });
     const { data: existingSubscription } = await supabase
@@ -159,9 +165,11 @@ Deno.serve(async (request) => {
     });
 
     if (insertError) throw insertError;
+    console.log("create-checkout-session created", { venueId: venue.id, plan, stripeMode, sessionId: session.id });
     return jsonResponse({ url: session.url });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not create checkout session.";
+    console.error("create-checkout-session failed", { reason: message });
     return jsonResponse({ error: message }, { status: 500 });
   }
 });

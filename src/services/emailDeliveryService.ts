@@ -1,4 +1,5 @@
 import { trackEvent } from "@/lib/analytics";
+import { reportError } from "@/lib/errorReporting";
 
 interface SendNotificationEmailInput {
   notificationId?: string;
@@ -20,7 +21,18 @@ const DISPATCH_ENDPOINT = "/api/send-notification-email";
 
 export async function queueEmailDeliveryForNotification(input: SendNotificationEmailInput): Promise<void> {
   trackEvent("email_notification_queued", { hasActionUrl: true });
-  await sendNotificationEmail(input);
+  try {
+    await sendNotificationEmail(input);
+  } catch (error) {
+    // Callers fire and forget, so this is the one place a failed send is seen in production.
+    reportError(error, {
+      source: "email_delivery",
+      notification_id: input.notificationId,
+      booking_request_id: input.bookingRequestId,
+      enquiry_id: input.enquiryId,
+    });
+    throw error;
+  }
 }
 
 export async function sendNotificationEmail(input: SendNotificationEmailInput): Promise<void> {

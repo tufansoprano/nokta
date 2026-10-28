@@ -1,0 +1,45 @@
+# Deploys the Supabase edge functions from this repo, so what runs is what is
+# committed. Pushes to qa deploy to nokta-qa, pushes to main deploy to production.
+# The dashboard's "Deploy updates" button redeploys Supabase's stored copy, not
+# this code, so don't rely on it.
+#
+# Needs repository secret SUPABASE_ACCESS_TOKEN (a personal access token from
+# https://supabase.com/dashboard/account/tokens with access to both projects).
+name: Deploy edge functions
+
+on:
+  push:
+    branches: [qa, main]
+    paths:
+      - "supabase/functions/**"
+      - "supabase/config.toml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-edge-functions-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: ${{ github.ref_name == 'main' && 'fsfkjfgzgtvdzfhqehel' || 'wnghcabvzvitzrcpfvzs' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Deploy
+        run: |
+          supabase functions deploy \
+            stripe-webhook \
+            create-checkout-session \
+            create-billing-portal-session \
+            refresh-owner-subscription \
+            send-notification-email \
+            --project-ref "$PROJECT_REF" --use-api

@@ -30,8 +30,8 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       PROJECT_REF: ${{ github.ref_name == 'main' && 'fsfkjfgzgtvdzfhqehel' || 'wnghcabvzvitzrcpfvzs' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: supabase/setup-cli@v1
+      - uses: actions/checkout@v7
+      - uses: supabase/setup-cli@v3
         with:
           version: latest
       - name: Deploy

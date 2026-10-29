@@ -66,11 +66,11 @@ export function VenueBookingToolbar({
   );
 }
 
-export function VenueBookingLegend({ showOpeningHours = true, note }: { showOpeningHours?: boolean; note: string }) {
+export function VenueBookingLegend({ showOpeningHours = true, pendingLabel = "Pending your reply", note }: { showOpeningHours?: boolean; pendingLabel?: string; note: string }) {
   return (
     <div className="flex flex-wrap items-center gap-[14px] border-t bg-nokta-hover px-[14px] py-[11px] text-xs text-nokta-ink-muted border-nokta-border">
       <LegendSwatch className="border-nokta-ok-line bg-nokta-ok-tint" label="Confirmed" />
-      <LegendSwatch className="border-dashed border-nokta-warn-line bg-nokta-warn-tint" label="Pending your reply" />
+      <LegendSwatch className="border-dashed border-nokta-warn-line bg-nokta-warn-tint" label={pendingLabel} />
       {showOpeningHours ? <LegendSwatch className="border-transparent bg-nokta-track" label="Outside opening hours" /> : null}
       <LegendSwatch className="border-transparent bg-[repeating-linear-gradient(45deg,var(--color-nokta-track)_0_6px,var(--color-nokta-hover)_6px_12px)]" label="Closure" />
       <span className="ml-auto">{note}</span>

@@ -13,6 +13,7 @@ const NotificationsPage = lazyPage(() => import("@/pages/account/NotificationsPa
 const AdminInsightsPage = lazyPage(() => import("@/pages/admin/AdminInsightsPage"), "AdminInsightsPage");
 const AdminCommercialPage = lazyPage(() => import("@/pages/admin/AdminCommercialPage"), "AdminCommercialPage");
 const AdminDemandPage = lazyPage(() => import("@/pages/admin/AdminDemandPage"), "AdminDemandPage");
+const AdminBookingsPage = lazyPage(() => import("@/pages/admin/AdminBookingsPage"), "AdminBookingsPage");
 const AdminVenuesPage = lazyPage(() => import("@/pages/admin/AdminVenuesPage"), "AdminVenuesPage");
 const AdminReviewQueuePage = lazyPage(() => import("@/pages/admin/AdminReviewQueuePage"), "AdminReviewQueuePage");
 const VenueFormPage = lazyPage<{ mode: "edit" | "new" }>(() => import("@/pages/admin/VenueFormPage"), "VenueFormPage");
@@ -256,6 +257,14 @@ export const routes: RouteObject[] = [
             { path: "/promoted-offer-preview", element: routeElement(<PromotedOfferPreviewPage />) },
           ]
         : []),
+      {
+        path: "/admin/bookings",
+        element: routeElement(
+          <RequireAdmin>
+            <AdminBookingsPage />
+          </RequireAdmin>,
+        ),
+      },
       {
         path: "/admin/demand",
         element: routeElement(

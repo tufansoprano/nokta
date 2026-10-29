@@ -22,14 +22,18 @@ export function VenueBookingWeekGrid({
   openingHours,
   closures,
   durationMinutes = 120,
+  showVenue = false,
   onEventClick,
 }: {
   dateFrom: string;
   dateTo: string;
   events: BookingCalendarEvent[];
-  openingHours: OpeningHours[];
+  /** Omit when the grid spans several venues: there are no single opening hours to shade. */
+  openingHours?: OpeningHours[];
   closures: VenueBookingBlackoutDate[];
   durationMinutes?: number;
+  /** Name the venue on each block, for calendars that span several venues. */
+  showVenue?: boolean;
   onEventClick: (event: BookingCalendarEvent) => void;
 }) {
   const dates = getDatesBetween(dateFrom, dateTo);
@@ -72,6 +76,7 @@ export function VenueBookingWeekGrid({
                 openingHours={openingHours}
                 closure={getClosureForDate({ closures, date })}
                 durationHours={durationMinutes / 60}
+                showVenue={showVenue}
                 onEventClick={onEventClick}
               />
             ))}
@@ -79,7 +84,11 @@ export function VenueBookingWeekGrid({
         </div>
       </div>
 
-      <VenueBookingLegend note={`Blocks show your ${formatDurationMinutes(durationMinutes)} default`} />
+      <VenueBookingLegend
+        showOpeningHours={Boolean(openingHours)}
+        pendingLabel={showVenue ? "Pending reply" : undefined}
+        note={showVenue ? `Blocks show a ${formatDurationMinutes(durationMinutes)} default` : `Blocks show your ${formatDurationMinutes(durationMinutes)} default`}
+      />
     </div>
   );
 }
@@ -90,16 +99,18 @@ function DayColumn({
   openingHours,
   closure,
   durationHours,
+  showVenue,
   onEventClick,
 }: {
   date: string;
   events: BookingCalendarEvent[];
-  openingHours: OpeningHours[];
+  openingHours?: OpeningHours[];
   closure: VenueBookingBlackoutDate | null;
   durationHours: number;
+  showVenue: boolean;
   onEventClick: (event: BookingCalendarEvent) => void;
 }) {
-  const closedBand = getClosedBandGeometry({ openingHours, date });
+  const closedBand = openingHours ? getClosedBandGeometry({ openingHours, date }) : null;
 
   return (
     <div
@@ -136,6 +147,7 @@ function DayColumn({
                 )}
               >
                 <span className="block text-[11px] font-semibold text-nokta-ink">{event.time.slice(0, 5)} · {event.partySize}</span>
+                {showVenue ? <span className="block truncate text-[11px] font-medium text-nokta-ink">{event.venueName}</span> : null}
                 <span className="block truncate text-[11px] text-nokta-ink-muted">{event.customerName} · {pending ? "pending" : "confirmed"}</span>
               </button>
             );

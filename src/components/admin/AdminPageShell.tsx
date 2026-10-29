@@ -1,4 +1,4 @@
-import { ArrowLeft, BarChart3, ClipboardPenLine, CreditCard, LayoutDashboard, MapPin, MessageSquare } from "lucide-react";
+import { ArrowLeft, BarChart3, CalendarDays, ClipboardPenLine, CreditCard, LayoutDashboard, MapPin, MessageSquare } from "lucide-react";
 import type { ReactNode } from "react";
 import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
 
@@ -7,6 +7,7 @@ export const ADMIN_NAV_ITEMS = [
   // All six approve/reject workflows now live behind one queue.
   { label: "Review queue", to: "/admin/review", icon: ClipboardPenLine },
   { label: "Demand", to: "/admin/demand", icon: MessageSquare },
+  { label: "Bookings", to: "/admin/bookings", icon: CalendarDays },
   { label: "Commercial", to: "/admin/commercial", icon: CreditCard },
   { label: "Insights", to: "/admin/insights", icon: BarChart3 },
 ];

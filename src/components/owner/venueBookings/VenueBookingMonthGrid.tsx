@@ -12,12 +12,15 @@ export function VenueBookingMonthGrid({
   anchorDate,
   events,
   closures,
+  showVenue = false,
   onEventClick,
   onOpenDayInWeek,
 }: {
   anchorDate: Date;
   events: BookingCalendarEvent[];
   closures: VenueBookingBlackoutDate[];
+  /** Name the venue on each chip, for calendars that span several venues. */
+  showVenue?: boolean;
   onEventClick: (event: BookingCalendarEvent) => void;
   onOpenDayInWeek: (date: string) => void;
 }) {
@@ -84,7 +87,7 @@ export function VenueBookingMonthGrid({
                         )}
                       >
                         <b className="font-semibold">{event.time.slice(0, 5)}</b>
-                        <span className="truncate">· {event.partySize} {event.customerName}</span>
+                        <span className="truncate">· {event.partySize} {showVenue ? event.venueName : event.customerName}</span>
                       </button>
                     );
                   })}
@@ -100,7 +103,7 @@ export function VenueBookingMonthGrid({
         })}
       </div>
 
-      <VenueBookingLegend showOpeningHours={false} note="Two per day, then +n more opens that day in Week" />
+      <VenueBookingLegend showOpeningHours={false} pendingLabel={showVenue ? "Pending reply" : undefined} note="Two per day, then +n more opens that day in Week" />
     </div>
   );
 }

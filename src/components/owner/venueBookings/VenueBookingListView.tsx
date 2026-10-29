@@ -13,6 +13,7 @@ export function VenueBookingListView({
   isPast,
   confirmingId,
   durationMinutes = 120,
+  showVenue = false,
   onChangeFilter,
   onTogglePast,
   onConfirm,
@@ -25,9 +26,12 @@ export function VenueBookingListView({
   isPast: boolean;
   confirmingId: string | null;
   durationMinutes?: number;
+  /** Name the venue on each row, for lists that span several venues. */
+  showVenue?: boolean;
   onChangeFilter: (filter: VenueBookingListFilter) => void;
   onTogglePast: () => void;
-  onConfirm: (event: BookingCalendarEvent) => void;
+  /** Omit to hide the one-click Confirm; pending rows then only offer Reply. */
+  onConfirm?: (event: BookingCalendarEvent) => void;
   onOpen: (event: BookingCalendarEvent) => void;
 }) {
   const grouped = groupByDate(events);
@@ -82,20 +86,21 @@ export function VenueBookingListView({
                         <span className="text-sm font-semibold text-nokta-ink">{event.customerName} · {event.partySize} people</span>
                         <StatusPill event={event} />
                       </div>
+                      {showVenue ? <p className="mt-0.5 truncate text-[13px] font-medium text-nokta-ink">{event.venueName}</p> : null}
                       {event.occasion ? <p className="mt-0.5 truncate text-[13px] text-nokta-ink-muted">{event.occasion}</p> : null}
                     </div>
 
                     <div className="col-span-full flex gap-2 sm:col-span-1">
                       {pending ? (
                         <>
-                          <button
+                          {onConfirm ? <button
                             type="button"
                             onClick={() => onConfirm(event)}
                             disabled={confirmingId === event.id}
                             className="h-8 rounded-lg bg-nokta-accent-solid px-3 text-[13px] font-medium text-white transition-colors hover:bg-nokta-accent-solid/90 disabled:opacity-60"
                           >
                             {confirmingId === event.id ? "Confirming..." : "Confirm"}
-                          </button>
+                          </button> : null}
                           <button type="button" onClick={() => onOpen(event)} className="flex h-8 items-center rounded-lg border bg-nokta-surface px-3 text-[13px] font-medium text-nokta-ink transition-colors hover:bg-nokta-hover border-nokta-border">
                             Reply
                           </button>

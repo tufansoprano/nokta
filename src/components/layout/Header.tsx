@@ -32,6 +32,7 @@ const ADMIN_MENU_ITEMS = [
   { label: "Venues", to: "/admin/venues", icon: MapPin },
   { label: "Review queue", to: "/admin/review", icon: ClipboardPenLine },
   { label: "Demand", to: "/admin/demand", icon: MessageSquare },
+  { label: "Bookings", to: "/admin/bookings", icon: CalendarDays },
   { label: "Commercial", to: "/admin/commercial", icon: CreditCard },
   { label: "Insights", to: "/admin/insights", icon: BarChart3 },
 ] as const;

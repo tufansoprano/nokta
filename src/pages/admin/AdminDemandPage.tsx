@@ -288,8 +288,28 @@ function ForwardToVenuePanel({ venue, booking, isSaving, onAnswer }: { venue: Ve
           </div>
           <p className="text-xs text-nokta-ink-muted">The customer is emailed straight away.</p>
         </div>
-      ) : <p className="mt-3 text-[13px] text-nokta-ink-muted">Answered: {formatBookingRequestStatus(booking.status)}.</p>}
+      ) : <AnsweredForVenue booking={booking} />}
     </section>
+  );
+}
+
+/** What was sent to the customer: the status, any suggested time, and the message typed with it. */
+function AnsweredForVenue({ booking }: { booking: BookingRequest }) {
+  const isProposal = booking.status === "alternative_proposed" || booking.status === "customer_accepted_alternative";
+  const message = isProposal ? booking.proposedMessage : booking.ownerResponseMessage;
+  return (
+    <div className="mt-3 space-y-2 text-[13px]">
+      <p className="text-nokta-ink-muted">
+        Answered: <span className="font-semibold text-nokta-ink">{formatBookingRequestStatus(booking.status)}</span>
+        {isProposal && booking.proposedDate && booking.proposedTime ? ` · suggested ${booking.proposedDate} at ${booking.proposedTime.slice(0, 5)}` : null}
+      </p>
+      {message ? (
+        <div className="rounded-lg border bg-nokta-surface px-3 py-2 border-nokta-border">
+          <p className="text-[11px] font-semibold uppercase tracking-[1px] text-nokta-ink-muted">Message sent to the customer</p>
+          <p className="mt-1 whitespace-pre-wrap leading-[1.6]">{message}</p>
+        </div>
+      ) : <p className="text-nokta-ink-muted">No message was sent with it.</p>}
+    </div>
   );
 }
 

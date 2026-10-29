@@ -5,7 +5,6 @@ import { VenueBookingListView, type VenueBookingListFilter } from "@/components/
 import { VenueBookingMonthGrid } from "@/components/owner/venueBookings/VenueBookingMonthGrid";
 import { VenueBookingToolbar } from "@/components/owner/venueBookings/VenueBookingToolbar";
 import { VenueBookingWeekGrid } from "@/components/owner/venueBookings/VenueBookingWeekGrid";
-import { CitySelector } from "@/components/search/CitySelector";
 import { PageMeta } from "@/components/seo/PageMeta";
 import { ErrorState } from "@/components/state/ErrorState";
 import { LoadingState } from "@/components/state/LoadingState";
@@ -16,13 +15,15 @@ import { addCalendarPeriod, formatCalendarHeading, getBookingCalendarDateRange, 
 import { mapBookingRequestToCalendarEvent } from "@/lib/bookingCalendarMappers";
 import { isEventAwaitingReply } from "@/lib/bookingCalendarGeometry";
 import { getEffectiveBookingSlot, OCCUPYING_BOOKING_STATUSES } from "@/lib/bookingSlot";
-import { DEFAULT_CITY } from "@/lib/cities";
+import { getCityOptions } from "@/lib/cities";
 import { getAdminBookingRequests } from "@/services/adminBookingRequestService";
 import type { BookingCalendarEvent, BookingCalendarView } from "@/types/bookingCalendar";
 import type { BookingRequest } from "@/types/bookingRequests";
 import type { Venue } from "@/types/venue";
 
 const VIEWS: BookingCalendarView[] = ["today", "week", "month", "list"];
+const ALL_CITIES = "all";
+const CITY_OPTIONS = [{ label: "All cities", value: ALL_CITIES }, ...getCityOptions()];
 
 /**
  * Every booking request on nokta, on one calendar. Read-only: answering stays in
@@ -41,7 +42,7 @@ export function AdminBookingsPage() {
   const anchorDate = useMemo(() => readDate(searchParams.get("date")), [searchParams]);
   const listFilter = (searchParams.get("filter") as VenueBookingListFilter | null) ?? "all";
   const isPast = searchParams.get("past") === "1";
-  const city = searchParams.get("city") ?? DEFAULT_CITY;
+  const city = searchParams.get("city") ?? ALL_CITIES;
   const venueFilter = searchParams.get("venue") ?? "all";
 
   useEffect(() => {
@@ -77,9 +78,9 @@ export function AdminBookingsPage() {
 
   const venuesById = useMemo<Record<string, Venue>>(() => Object.fromEntries(venues.map((venue) => [venue.id, venue])), [venues]);
 
-  // Spam never belongs on a calendar; everything else in the chosen city does.
+  // Spam never belongs on a calendar; everything else in the chosen city (or every city) does.
   const cityRequests = useMemo(
-    () => requests.filter((request) => request.status !== "spam" && venuesById[request.venueId]?.city === city),
+    () => requests.filter((request) => request.status !== "spam" && (city === ALL_CITIES || venuesById[request.venueId]?.city === city)),
     [requests, venuesById, city],
   );
 
@@ -118,7 +119,7 @@ export function AdminBookingsPage() {
           title="Bookings"
           description="Every booking request across every venue. Open one to answer it in Demand."
           actions={<>
-            <div className="w-[150px]"><CitySelector value={city} onChange={(value) => updateParams({ city: value, venue: null })} /></div>
+            <Select value={city} aria-label="City" options={CITY_OPTIONS} onValueChange={(value) => updateParams({ city: value === ALL_CITIES ? null : value, venue: null })} className="h-10 w-[150px]" />
             <Select value={venueFilter} aria-label="Filter by venue" options={venueOptions} onValueChange={(value) => updateParams({ venue: value === "all" ? null : value })} className="h-10 w-[220px]" />
             <Link to="/admin/demand?kind=booking" className={workspaceSecondaryActionClass}>Open Demand</Link>
           </>}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { AdminPageShell } from "@/components/admin/AdminPageShell";
 import { WorkspacePageHeader, workspaceSecondaryActionClass } from "@/components/workspace/WorkspacePageHeader";
 import { CitySelector } from "@/components/search/CitySelector";
@@ -221,7 +221,7 @@ export function AdminDemandPage() {
       {selected ? (
         <div className="fixed inset-0 z-[1600] grid place-items-center bg-nokta-ink/40 p-4" role="dialog" aria-modal="true">
           <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border bg-nokta-surface p-5 shadow-xl border-nokta-border">
-            <div className="flex items-start justify-between gap-4"><div><TypeChip kind={selected.kind} /><h2 className="mt-2 font-brand text-xl font-bold">{selected.customerName}</h2><p className="mt-1 text-[13px] text-nokta-ink-muted">{venuesById[selected.venueId]?.name ?? selected.venueId} · {formatStatus(selected)}</p></div><Button variant="ghost" onClick={() => updateParams({ item: null })}>Close</Button></div>
+            <div className="flex items-start justify-between gap-4"><div><TypeChip kind={selected.kind} /><h2 className="mt-2 font-brand text-xl font-bold">{selected.customerName}</h2><p className="mt-1 text-[13px] text-nokta-ink-muted">{venuesById[selected.venueId]?.name ?? selected.venueId} · {formatStatus(selected)}{venuesById[selected.venueId] ? <> · <Link to={`/owner/venues/${venuesById[selected.venueId].slug}/bookings`} className="font-medium text-nokta-accent-dark hover:underline">Venue workspace</Link></> : null}</p></div><Button variant="ghost" onClick={() => updateParams({ item: null })}>Close</Button></div>
             <dl className="mt-4 grid gap-3 rounded-xl border p-4 text-sm sm:grid-cols-2 border-nokta-border"><Detail label="Email" value={selected.customerEmail} /><Detail label="Phone" value={selected.customerPhone} /><Detail label="Request" value={selected.customerDetail} /><Detail label="Reference" value={selected.reference} /></dl>
             {selected.message ? <div className="mt-3 rounded-xl border p-4 border-nokta-border"><p className="text-[11px] font-semibold uppercase tracking-[1px] text-nokta-ink-muted">Customer message</p><p className="mt-2 whitespace-pre-wrap text-sm leading-[1.6]">{selected.message}</p></div> : null}
             {selected.kind === "booking" && venuesById[selected.venueId] && !venuesById[selected.venueId].isClaimed ? <ForwardToVenuePanel key={selected.id} venue={venuesById[selected.venueId]} booking={selected.raw as BookingRequest} isSaving={isSaving} onAnswer={answerForVenue} /> : null}

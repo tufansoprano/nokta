@@ -38,6 +38,7 @@ export function AdminVenueTable({ venues }: { venues: Venue[] }) {
               <div className="min-w-0"><MobileLabel>Commercial</MobileLabel><MonetisationStatusBadge status={venue.monetisationStatus} /></div>
               <div className="col-span-2 flex items-center gap-3 border-t border-nokta-divider-row pt-3 text-[13px] font-semibold xl:col-span-1 xl:justify-end xl:border-0 xl:pt-0">
                 <Link className="text-nokta-accent-dark hover:underline" to={`/admin/venues/${venue.id}/edit`}>Edit</Link>
+                <Link className="text-nokta-accent-dark hover:underline" to={`/owner/venues/${venue.slug}/bookings`}>Workspace</Link>
                 <Link className="inline-flex items-center gap-1 text-nokta-ink-muted hover:text-nokta-ink hover:underline" to={`/venues/${venue.slug}`}>
                   View <ExternalLink aria-hidden="true" className="size-3.5" />
                 </Link>

@@ -21,7 +21,7 @@ import { getOwnerVenueAnalyticsSummary, type OwnerAnalyticsDateRange, type Owner
 
 export function OwnerVenueAnalyticsPage() {
   const { user } = useAuth();
-  const { venue, subscription } = useOwnerVenue();
+  const { venue, subscription, isAdminView } = useOwnerVenue();
   const [dateRange, setDateRange] = useState<OwnerAnalyticsDateRange>("last_30_days");
   const [summary, setSummary] = useState<OwnerVenueAnalyticsSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -51,9 +51,9 @@ export function OwnerVenueAnalyticsPage() {
     };
   }, [dateRange, user, venue.id]);
 
-  const canSeeTrend = subscriptionHasPlanAccess(subscription, "basic_analytics") && (subscription?.plan ?? "free") !== "free";
-  const canSeeFunnel = subscriptionHasPlanAccess(subscription, "improved_analytics");
-  const canSeeAdvanced = subscriptionHasPlanAccess(subscription, "advanced_analytics");
+  const canSeeTrend = isAdminView || (subscriptionHasPlanAccess(subscription, "basic_analytics") && (subscription?.plan ?? "free") !== "free");
+  const canSeeFunnel = isAdminView || subscriptionHasPlanAccess(subscription, "improved_analytics");
+  const canSeeAdvanced = isAdminView || subscriptionHasPlanAccess(subscription, "advanced_analytics");
   const hasActivity = Boolean(summary?.totalEvents);
 
   return (

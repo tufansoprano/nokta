@@ -2,6 +2,7 @@ import { mapVenueBookingBlackoutDateRow, mapVenueBookingSettingsRow, mapVenueBoo
 import { validateVenueBookingSettings, validateVenueBookingWindow } from "@/lib/bookingAvailabilityValidation";
 import { trackEvent } from "@/lib/analytics";
 import { supabase, supabaseConfigError } from "@/lib/supabase";
+import { getMyClaimedVenue } from "@/services/ownerVenueService";
 import type { VenueBookingAvailability, VenueBookingBlackoutDate, VenueBookingSettings, VenueBookingWindow } from "@/types/bookingAvailability";
 import type { VenueBookingBlackoutDateRow, VenueBookingSettingsRow, VenueBookingWindowRow } from "@/types/database";
 
@@ -12,8 +13,8 @@ function ensureSupabase() {
 
 export async function getOwnerVenueBookingAvailability(input: { ownerUserId: string; venueId: string }): Promise<VenueBookingAvailability> {
   const client = ensureSupabase();
-  const { data: venue, error: venueError } = await client.from("venues").select("id").eq("id", input.venueId).eq("claimed_by", input.ownerUserId).single();
-  if (venueError || !venue) throw new Error("You do not have access to this venue's availability settings.");
+  const venue = await getMyClaimedVenue({ userId: input.ownerUserId, venueId: input.venueId });
+  if (!venue) throw new Error("You do not have access to this venue's availability settings.");
   await client.from("venue_booking_settings").insert({ venue_id: input.venueId }).select("*").maybeSingle();
   const [{ data: settings }, { data: windows }, { data: blackoutDates }] = await Promise.all([
     client.from("venue_booking_settings").select("*").eq("venue_id", input.venueId).single(),

@@ -15,6 +15,8 @@ interface OwnerVenueContextValue {
   venue: Venue;
   setVenue: Dispatch<SetStateAction<Venue | null>>;
   subscription: VenueSubscription | null;
+  /** A nokta admin viewing a venue they don't own: plan gates are lifted so nothing is hidden from them. */
+  isAdminView: boolean;
 }
 
 interface TabHeaderSlots {
@@ -69,6 +71,8 @@ export function OwnerVenueRouteLayout() {
     };
   }, [userId, venueId]);
 
+  const isAdminView = Boolean(venue && userId && venue.claimedBy !== userId);
+
   return (
     <OwnerLayout fullWidth>
       {isLoading || error || !venue ? (
@@ -76,7 +80,7 @@ export function OwnerVenueRouteLayout() {
           {isLoading ? <LoadingState message="Loading venue..." /> : <ErrorState message={error ?? "Could not load that venue."} />}
         </div>
       ) : (
-        <OwnerVenueContext.Provider value={{ venue, setVenue, subscription }}>
+        <OwnerVenueContext.Provider value={{ venue, setVenue, subscription, isAdminView }}>
           <TabHeaderSlotsContext.Provider value={{ title: titleSlot, actions: actionsSlot, guardRef }}>
             <OwnerVenueTabShell
               venue={venue}
@@ -84,6 +88,7 @@ export function OwnerVenueRouteLayout() {
               titleSlotRef={setTitleSlot}
               actionsSlotRef={setActionsSlot}
               canNavigate={() => guardRef.current?.() ?? true}
+              isAdminView={isAdminView}
             >
               <Suspense fallback={<LoadingState message="Loading..." />}>
                 <Outlet />

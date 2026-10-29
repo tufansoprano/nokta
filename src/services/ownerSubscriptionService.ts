@@ -1,6 +1,7 @@
 import { subscriptionHasPlanAccess, type VenuePlanFeature } from "@/lib/planFeatureAccess";
 import { createFreeSubscriptionFallback, mapVenueSubscriptionRowToSubscription } from "@/lib/subscriptionMappers";
 import { supabase, supabaseConfigError } from "@/lib/supabase";
+import { getMyClaimedVenue } from "@/services/ownerVenueService";
 import type { VenueSubscriptionRow } from "@/types/database";
 import type { VenueSubscription } from "@/types/subscriptions";
 
@@ -11,15 +12,7 @@ function ensureSupabase() {
 
 export async function getOwnerVenueSubscription(input: { userId: string; venueId: string }): Promise<VenueSubscription | null> {
   const client = ensureSupabase();
-  const { data: venue, error: venueError } = await client
-    .from("venues")
-    .select("id")
-    .or(`id.eq.${input.venueId},slug.eq.${input.venueId}`)
-    .eq("is_claimed", true)
-    .eq("claimed_by", input.userId)
-    .maybeSingle();
-
-  if (venueError) throw new Error(`Could not verify venue access: ${venueError.message}`);
+  const venue = await getMyClaimedVenue({ userId: input.userId, venueId: input.venueId });
   if (!venue) return null;
 
   const { data, error } = await client.from("venue_subscriptions").select("*").eq("venue_id", venue.id).maybeSingle();

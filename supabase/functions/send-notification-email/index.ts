@@ -277,7 +277,7 @@ async function buildEmail(supabase: ReturnType<typeof createAdminClient>, notifi
     return buildBookingEmail(notification, data, appUrl());
   }
   if (notification.enquiry_id) {
-    const { data, error } = await supabase.from("venue_enquiries").select("*,venues(name)").eq("id", notification.enquiry_id).single();
+    const { data, error } = await supabase.from("venue_enquiries").select("*,venues(name,is_claimed)").eq("id", notification.enquiry_id).single();
     if (error) throw error;
     return buildEnquiryEmail(notification, data, appUrl());
   }

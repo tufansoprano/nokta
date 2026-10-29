@@ -101,6 +101,19 @@ export function buildBookingEmail(notification: NotificationRow, booking: Record
 
   switch (notification.notification_type) {
     case "booking_request_submitted":
+      if (notification.recipient_type === "admin" && isClaimed) {
+        // A copy of the owner's alert, so nokta sees every request.
+        return renderEmail({
+          subject: `New booking request: ${venueName}`,
+          status: { label: "New request", tone: "info" },
+          title: `Booking request for ${venueName}`,
+          intro: `${venueName}'s owner has this request too. Step in from Demand if they don't answer.`,
+          message: { label: "Customer's message", body: booking.message },
+          sections: [{ rows: [...requested, reference] }, { title: "Customer", rows: customer }],
+          action: { label: "Open in Demand", url: actionUrl },
+          footer: FOOTERS.admin,
+        });
+      }
       if (notification.recipient_type === "admin") {
         return renderEmail({
           subject: `Forward booking request: ${venueName}`,
@@ -178,14 +191,16 @@ export function buildBookingEmail(notification: NotificationRow, booking: Record
         subject: accepted ? `Customer accepted the suggested time at ${venueName}` : `Customer declined the suggested time at ${venueName}`,
         status: accepted ? { label: "Time accepted", tone: "ok" } : { label: "Time declined", tone: "bad" },
         title: accepted ? "The customer accepted the new time" : "The customer declined the new time",
-        intro: isAdmin
+        intro: isAdmin && !isClaimed
           ? `Let ${venueName} know the customer ${accepted ? "accepted" : "declined"} the time they suggested.`
-          : accepted ? "The booking is now confirmed for the time you suggested." : "They can't make the time you suggested.",
+          : isAdmin
+            ? `The customer ${accepted ? "accepted" : "declined"} the time ${venueName} suggested. The owner has been told.`
+            : accepted ? "The booking is now confirmed for the time you suggested." : "They can't make the time you suggested.",
         message: { label: "Customer's message", body: booking.customer_alternative_response_message },
         sections: [
           { rows: [["Venue", venueName], ["Suggested", formatDateTime(booking.proposed_date, booking.proposed_time)], ["Originally asked for", formatDateTime(booking.requested_date, booking.requested_time)], ["Party", party], reference] },
           { title: "Customer", rows: customer },
-          ...(isAdmin ? [{ title: "Venue contact", rows: venueContact }] : []),
+          ...(isAdmin && !isClaimed ? [{ title: "Venue contact", rows: venueContact }] : []),
         ],
         action: isAdmin ? { label: "Open in Demand", url: actionUrl } : { label: "View booking", url: ownerUrl },
         footer: isAdmin ? FOOTERS.admin : FOOTERS.owner,
@@ -221,15 +236,22 @@ export function buildBookingEmail(notification: NotificationRow, booking: Record
 
 export function buildEnquiryEmail(notification: NotificationRow, enquiry: Record<string, any>, appUrl: string): RenderedEmail {
   const venueName = clean(enquiry.venues?.name) || "your venue";
+  const isAdmin = notification.recipient_type === "admin";
+  const isClaimed = enquiry.venues?.is_claimed !== false;
+  const customer: Row[] = [["Name", enquiry.customer_name], ["Email", enquiry.customer_email], ["Phone", enquiry.customer_phone]];
   return renderEmail({
-    subject: `New enquiry for ${venueName}`,
-    status: { label: "New enquiry", tone: "info" },
-    title: "New enquiry",
-    intro: `${clean(enquiry.customer_name) || "A customer"} sent ${venueName} an enquiry. Reply to them directly.`,
+    subject: isAdmin && !isClaimed ? `Forward enquiry: ${venueName}` : `New enquiry for ${venueName}`,
+    status: isAdmin && !isClaimed ? { label: "To forward", tone: "warn" } : { label: "New enquiry", tone: "info" },
+    title: isAdmin ? `Enquiry for ${venueName}` : "New enquiry",
+    intro: !isAdmin
+      ? `${clean(enquiry.customer_name) || "A customer"} sent ${venueName} an enquiry. Reply to them directly.`
+      : isClaimed
+        ? `${venueName}'s owner has this enquiry too. Step in from Demand if they don't answer.`
+        : `${venueName} isn't on nokta yet. Pass this enquiry on to them.`,
     message: { label: "Customer's message", body: enquiry.message },
-    sections: [{ rows: [["Venue", venueName], ["Type", humanise(enquiry.enquiry_type)], ["Party", enquiry.party_size ? `${enquiry.party_size} people` : null], ["Name", enquiry.customer_name], ["Email", enquiry.customer_email], ["Phone", enquiry.customer_phone]] }],
+    sections: [{ rows: [["Venue", venueName], ["Type", humanise(enquiry.enquiry_type)], ["Party", enquiry.party_size ? `${enquiry.party_size} people` : null], ...customer] }],
     action: { label: notification.action_label ?? "View enquiries", url: absoluteUrl(appUrl, notification.action_url ?? "/owner/enquiries") },
-    footer: FOOTERS.owner,
+    footer: isAdmin ? FOOTERS.admin : FOOTERS.owner,
   });
 }
 
